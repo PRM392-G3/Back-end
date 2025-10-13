@@ -32,6 +32,15 @@ namespace SocialNetworkMobile.Repository.Models
         [Column("ProfileUrl")]
         public string? ProfileUrl { get; set; }
 
+        [MaxLength(1024)]
+        [Column("CoverImageUrl")]
+        public string? CoverImageUrl { get; set; }
+
+        [MaxLength(500)]
+        [Column("Bio")]
+        public string? Bio { get; set; }
+
+
         [Column("CreatedAt")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

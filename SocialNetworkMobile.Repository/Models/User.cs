@@ -27,6 +27,11 @@ namespace SocialNetworkMobile.Repository.Models
         [Column("AvatarUrl")]
         public string? AvatarUrl { get; set; }
 
+        [MaxLength(1024)]
+        [Column("CoverImageUrl")]
+        public string? CoverImageUrl { get; set; }
+
+
         [MaxLength(20)]
         [Column("PhoneNumber")]
         public string? PhoneNumber { get; set; }

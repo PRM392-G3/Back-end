@@ -3,6 +3,7 @@ using SocialNetworkMobile.Services.Interfaces;
 using SocialNetworkMobile.Services.Object.Requests;
 using SocialNetworkMobile.Services.Object.Responses;
 using Microsoft.AspNetCore.Authorization;
+using SocialNetworkMobile.Repository.Models;
 
 namespace SocialNetworkMobile.Controllers
 {
@@ -153,6 +154,38 @@ namespace SocialNetworkMobile.Controllers
             {
                 var isFollowing = await _userService.IsFollowingAsync(followerId, followingId);
                 return Ok(new { isFollowing });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("{userId}/avatar-history")]
+        [Authorize]
+        public async Task<ActionResult<List<AvatarHistory>>> GetAvatarHistory(int userId)
+        {
+            try
+            {
+                var avatarHistory = await _userService.GetAvatarHistoryAsync(userId);
+                return Ok(avatarHistory);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpPost("{userId}/restore-avatar/{avatarHistoryId}")]
+        [Authorize]
+        public async Task<ActionResult> RestoreAvatarFromHistory(int userId, int avatarHistoryId)
+        {
+            try
+            {
+                var result = await _userService.RestoreAvatarFromHistoryAsync(userId, avatarHistoryId);
+                if (result)
+                    return Ok(new { message = "Avatar restored successfully" });
+                return BadRequest("Unable to restore avatar");
             }
             catch (ArgumentException ex)
             {
