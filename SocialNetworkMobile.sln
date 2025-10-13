@@ -1,0 +1,33 @@
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35527.113
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SocialNetworkMobile.Repository", "SocialNetworkMobile.Repository\SocialNetworkMobile.Repository.csproj", "{70011C34-E302-4E34-AB1E-9B331154A28A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SocialNetworkMobile.Services", "SocialNetworkMobile.Services\SocialNetworkMobile.Services.csproj", "{D02FB006-5A1C-4ABE-8860-E4E4390708C2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SocialNetworkMobile", "SocialNetworkMobile\SocialNetworkMobile.csproj", "{1C771F7B-A493-4C2C-9992-6C9BCB574622}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{70011C34-E302-4E34-AB1E-9B331154A28A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{70011C34-E302-4E34-AB1E-9B331154A28A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{70011C34-E302-4E34-AB1E-9B331154A28A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{70011C34-E302-4E34-AB1E-9B331154A28A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D02FB006-5A1C-4ABE-8860-E4E4390708C2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D02FB006-5A1C-4ABE-8860-E4E4390708C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D02FB006-5A1C-4ABE-8860-E4E4390708C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D02FB006-5A1C-4ABE-8860-E4E4390708C2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1C771F7B-A493-4C2C-9992-6C9BCB574622}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1C771F7B-A493-4C2C-9992-6C9BCB574622}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1C771F7B-A493-4C2C-9992-6C9BCB574622}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1C771F7B-A493-4C2C-9992-6C9BCB574622}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
