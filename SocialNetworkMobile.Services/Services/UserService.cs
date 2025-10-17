@@ -91,6 +91,7 @@ namespace SocialNetworkMobile.Services.Services
                 {
                     UserId = user.Id,
                     AvatarUrl = user.AvatarUrl,
+                    CoverImageUrl = user.CoverImageUrl ?? string.Empty,
                     CreatedAt = DateTime.UtcNow,
                     Description = "Previous avatar before update"
                 };
@@ -101,6 +102,8 @@ namespace SocialNetworkMobile.Services.Services
                 user.FullName = request.FullName;
             if (!string.IsNullOrEmpty(request.Bio))
                 user.Bio = request.Bio;
+            if (!string.IsNullOrEmpty(request.CoverImageUrl))
+                user.CoverImageUrl = request.CoverImageUrl;
             if (!string.IsNullOrEmpty(request.AvatarUrl))
                 user.AvatarUrl = request.AvatarUrl;
             if (!string.IsNullOrEmpty(request.PhoneNumber))

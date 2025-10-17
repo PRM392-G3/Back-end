@@ -16,6 +16,10 @@ namespace SocialNetworkMobile.Repository.Models
         public string AvatarUrl { get; set; } = string.Empty;
 
         [Required]
+        [MaxLength(500)]
+        public string CoverImageUrl { get; set; } = string.Empty;
+
+        [Required]
         public DateTime CreatedAt { get; set; }
 
         [MaxLength(200)]

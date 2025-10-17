@@ -13,6 +13,9 @@ namespace SocialNetworkMobile.Services.Object.Requests
         [MaxLength(1024)]
         public string? AvatarUrl { get; set; }
 
+        [MaxLength(1024)]
+        public string? CoverImageUrl { get; set; }
+
         [MaxLength(20)]
         public string? PhoneNumber { get; set; }
 

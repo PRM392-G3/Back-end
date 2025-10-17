@@ -272,6 +272,7 @@ namespace SocialNetworkMobile.Repository.Context
                 entity.Property(e => e.Id).HasColumnName("Id");
                 entity.Property(e => e.UserId).HasColumnName("UserId");
                 entity.Property(e => e.AvatarUrl).HasColumnName("AvatarUrl").IsRequired().HasMaxLength(500);
+                entity.Property(e => e.CoverImageUrl).HasColumnName("CoverImageUrl").IsRequired().HasMaxLength(500);
                 entity.Property(e => e.Description).HasColumnName("Description").HasMaxLength(200);
                 entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
                 entity.HasOne(d => d.User).WithMany()
