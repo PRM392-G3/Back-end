@@ -66,5 +66,6 @@ namespace SocialNetworkMobile.Repository.Models
         public virtual ICollection<UserSocialProvider> UserSocialProviders { get; set; } = new List<UserSocialProvider>();
         public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
         public virtual ICollection<Notification> SentNotifications { get; set; } = new List<Notification>();
+        public virtual ICollection<Share> Shares { get; set; } = new List<Share>();
     }
 }

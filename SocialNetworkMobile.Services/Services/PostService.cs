@@ -16,6 +16,7 @@ namespace SocialNetworkMobile.Services.Services
         private readonly GenericRepository<Comment> _commentRepository;
         private readonly GenericRepository<Tag> _tagRepository;
         private readonly GenericRepository<PostTag> _postTagRepository;
+        private readonly GenericRepository<Share> _shareRepository;
 
         public PostService(
             GenericRepository<Post> postRepository,
@@ -23,7 +24,8 @@ namespace SocialNetworkMobile.Services.Services
             GenericRepository<Like> likeRepository,
             GenericRepository<Comment> commentRepository,
             GenericRepository<Tag> tagRepository,
-            GenericRepository<PostTag> postTagRepository)
+            GenericRepository<PostTag> postTagRepository,
+            GenericRepository<Share> shareRepository)
         {
             _postRepository = postRepository;
             _userRepository = userRepository;
@@ -31,6 +33,7 @@ namespace SocialNetworkMobile.Services.Services
             _commentRepository = commentRepository;
             _tagRepository = tagRepository;
             _postTagRepository = postTagRepository;
+            _shareRepository = shareRepository;
         }
 
         public async Task<PostResponse> CreatePostAsync(CreatePostRequest request)
@@ -142,6 +145,25 @@ namespace SocialNetworkMobile.Services.Services
             }
             response.Comments = commentResponses;
 
+            // Get shares with user info
+            var shares = await _shareRepository.GetAllAsync(s => s.PostId == id);
+            var shareResponses = new List<ShareResponse>();
+            foreach (var share in shares)
+            {
+                var shareUser = await _userRepository.GetByIdAsync(share.UserId);
+                shareResponses.Add(new ShareResponse
+                {
+                    Id = share.Id,
+                    UserId = share.UserId,
+                    PostId = share.PostId,
+                    Caption = share.Caption,
+                    IsPublic = share.IsPublic,
+                    CreatedAt = share.CreatedAt,
+                    User = shareUser.Adapt<UserResponse>()
+                });
+            }
+            response.Shares = shareResponses;
+
             return response;
         }
 
@@ -205,6 +227,25 @@ namespace SocialNetworkMobile.Services.Services
                 }
                 response.Comments = commentResponses;
 
+                // Get shares with user info
+                var shares = await _shareRepository.GetAllAsync(s => s.PostId == post.Id);
+                var shareResponses = new List<ShareResponse>();
+                foreach (var share in shares)
+                {
+                    var shareUser = await _userRepository.GetByIdAsync(share.UserId);
+                    shareResponses.Add(new ShareResponse
+                    {
+                        Id = share.Id,
+                        UserId = share.UserId,
+                        PostId = share.PostId,
+                        Caption = share.Caption,
+                        IsPublic = share.IsPublic,
+                        CreatedAt = share.CreatedAt,
+                        User = shareUser.Adapt<UserResponse>()
+                    });
+                }
+                response.Shares = shareResponses;
+
                 responses.Add(response);
             }
 
@@ -229,6 +270,77 @@ namespace SocialNetworkMobile.Services.Services
                 var tagIds = postTags.Select(pt => pt.TagId).ToList();
                 var tags = await _tagRepository.GetAllAsync(t => tagIds.Contains(t.Id));
                 response.Tags = tags.Adapt<List<TagResponse>>();
+
+                // Get shares with user info
+                var shares = await _shareRepository.GetAllAsync(s => s.PostId == post.Id);
+                var shareResponses = new List<ShareResponse>();
+                foreach (var share in shares)
+                {
+                    var shareUser = await _userRepository.GetByIdAsync(share.UserId);
+                    shareResponses.Add(new ShareResponse
+                    {
+                        Id = share.Id,
+                        UserId = share.UserId,
+                        PostId = share.PostId,
+                        Caption = share.Caption,
+                        IsPublic = share.IsPublic,
+                        CreatedAt = share.CreatedAt,
+                        User = shareUser.Adapt<UserResponse>()
+                    });
+                }
+                response.Shares = shareResponses;
+
+                responses.Add(response);
+            }
+
+            return responses.OrderByDescending(p => p.CreatedAt).ToList();
+        }
+
+        public async Task<List<PostResponse>> GetSharedPostsByUserIdAsync(int userId)
+        {
+            // Get all shares by user
+            var shares = await _shareRepository.GetAllAsync(s => s.UserId == userId);
+            var postIds = shares.Select(s => s.PostId).ToList();
+            
+            if (!postIds.Any())
+                return new List<PostResponse>();
+
+            // Get posts that were shared
+            var posts = await _postRepository.GetAllAsync(p => postIds.Contains(p.Id) && p.IsDeleted == false);
+            var responses = new List<PostResponse>();
+
+            foreach (var post in posts)
+            {
+                var response = post.Adapt<PostResponse>();
+                
+                // Get user info
+                var user = await _userRepository.GetByIdAsync(post.UserId);
+                response.User = user.Adapt<UserResponse>();
+
+                // Get tags
+                var postTags = await _postTagRepository.GetAllAsync(pt => pt.PostId == post.Id);
+                var tagIds = postTags.Select(pt => pt.TagId).ToList();
+                var tags = await _tagRepository.GetAllAsync(t => tagIds.Contains(t.Id));
+                response.Tags = tags.Adapt<List<TagResponse>>();
+
+                // Get shares with user info
+                var postShares = await _shareRepository.GetAllAsync(s => s.PostId == post.Id);
+                var shareResponses = new List<ShareResponse>();
+                foreach (var share in postShares)
+                {
+                    var shareUser = await _userRepository.GetByIdAsync(share.UserId);
+                    shareResponses.Add(new ShareResponse
+                    {
+                        Id = share.Id,
+                        UserId = share.UserId,
+                        PostId = share.PostId,
+                        Caption = share.Caption,
+                        IsPublic = share.IsPublic,
+                        CreatedAt = share.CreatedAt,
+                        User = shareUser.Adapt<UserResponse>()
+                    });
+                }
+                response.Shares = shareResponses;
 
                 responses.Add(response);
             }
@@ -255,6 +367,25 @@ namespace SocialNetworkMobile.Services.Services
                 var tagIds = postTags.Select(pt => pt.TagId).ToList();
                 var tags = await _tagRepository.GetAllAsync(t => tagIds.Contains(t.Id));
                 response.Tags = tags.Adapt<List<TagResponse>>();
+
+                // Get shares with user info
+                var shares = await _shareRepository.GetAllAsync(s => s.PostId == post.Id);
+                var shareResponses = new List<ShareResponse>();
+                foreach (var share in shares)
+                {
+                    var shareUser = await _userRepository.GetByIdAsync(share.UserId);
+                    shareResponses.Add(new ShareResponse
+                    {
+                        Id = share.Id,
+                        UserId = share.UserId,
+                        PostId = share.PostId,
+                        Caption = share.Caption,
+                        IsPublic = share.IsPublic,
+                        CreatedAt = share.CreatedAt,
+                        User = shareUser.Adapt<UserResponse>()
+                    });
+                }
+                response.Shares = shareResponses;
 
                 responses.Add(response);
             }
