@@ -15,6 +15,8 @@ namespace SocialNetworkMobile.Services.Object.Responses
         public DateTime UpdatedAt { get; set; }
         public UserResponse User { get; set; } = null!;
         public List<TagResponse> Tags { get; set; } = new List<TagResponse>();
+        public List<LikeResponse> Likes { get; set; } = new List<LikeResponse>();
+        public List<CommentResponse> Comments { get; set; } = new List<CommentResponse>();
         public bool IsLiked { get; set; }
     }
 }
