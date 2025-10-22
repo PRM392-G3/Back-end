@@ -13,11 +13,13 @@ namespace SocialNetworkMobile.Services.Services
     {
         private readonly GenericRepository<User> _userRepository;
         private readonly GenericRepository<Follow> _followRepository;
+        private readonly GenericRepository<AvatarHistory> _avatarHistoryRepository;
 
-        public UserService(GenericRepository<User> userRepository, GenericRepository<Follow> followRepository)
+        public UserService(GenericRepository<User> userRepository, GenericRepository<Follow> followRepository, GenericRepository<AvatarHistory> avatarHistoryRepository)
         {
             _userRepository = userRepository;
             _followRepository = followRepository;
+            _avatarHistoryRepository = avatarHistoryRepository;
         }
 
         public async Task<UserResponse> CreateUserAsync(CreateUserRequest request)
@@ -83,10 +85,25 @@ namespace SocialNetworkMobile.Services.Services
             if (user == null)
                 throw new ArgumentException("User not found");
 
+            if (!string.IsNullOrEmpty(request.AvatarUrl) && !string.IsNullOrEmpty(user.AvatarUrl) && user.AvatarUrl != request.AvatarUrl)
+            {
+                var avatarHistory = new AvatarHistory
+                {
+                    UserId = user.Id,
+                    AvatarUrl = user.AvatarUrl,
+                    CoverImageUrl = user.CoverImageUrl ?? string.Empty,
+                    CreatedAt = DateTime.UtcNow,
+                    Description = "Previous avatar before update"
+                };
+                await _avatarHistoryRepository.CreateAsync(avatarHistory);
+            }
+
             if (!string.IsNullOrEmpty(request.FullName))
                 user.FullName = request.FullName;
             if (!string.IsNullOrEmpty(request.Bio))
                 user.Bio = request.Bio;
+            if (!string.IsNullOrEmpty(request.CoverImageUrl))
+                user.CoverImageUrl = request.CoverImageUrl;
             if (!string.IsNullOrEmpty(request.AvatarUrl))
                 user.AvatarUrl = request.AvatarUrl;
             if (!string.IsNullOrEmpty(request.PhoneNumber))
@@ -184,6 +201,41 @@ namespace SocialNetworkMobile.Services.Services
         {
             var follow = await _followRepository.GetFirstOrDefaultAsync(f => f.FollowerId == followerId && f.FollowingId == followingId);
             return follow != null;
+        }
+
+        public async Task<List<AvatarHistory>> GetAvatarHistoryAsync(int userId)
+        {
+            var avatarHistory = await _avatarHistoryRepository.GetAllAsync(ah => ah.UserId == userId);
+            return avatarHistory.OrderByDescending(ah => ah.CreatedAt).ToList();
+        }
+
+        public async Task<bool> RestoreAvatarFromHistoryAsync(int userId, int avatarHistoryId)
+        {
+            var avatarHistory = await _avatarHistoryRepository.GetByIdAsync(avatarHistoryId);
+            if (avatarHistory == null || avatarHistory.UserId != userId)
+                return false;
+
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+                return false;
+
+            if (!string.IsNullOrEmpty(user.AvatarUrl))
+            {
+                var currentAvatarHistory = new AvatarHistory
+                {
+                    UserId = user.Id,
+                    AvatarUrl = user.AvatarUrl,
+                    CreatedAt = DateTime.UtcNow,
+                    Description = "Avatar before restore from history"
+                };
+                await _avatarHistoryRepository.CreateAsync(currentAvatarHistory);
+            }
+
+            user.AvatarUrl = avatarHistory.AvatarUrl;
+            user.UpdatedAt = DateTime.UtcNow;
+            await _userRepository.UpdateAsync(user);
+
+            return true;
         }
     }
 }
