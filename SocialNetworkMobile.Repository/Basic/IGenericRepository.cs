@@ -46,5 +46,9 @@ namespace SocialNetworkMobile.Repository.Basic
 
         // Add method for adding entities
         Task AddAsync(T entity);
+
+        // Count methods
+        Task<int> CountAsync(Expression<Func<T, bool>> predicate);
+        Task<int> CountAsync();
     }
 }

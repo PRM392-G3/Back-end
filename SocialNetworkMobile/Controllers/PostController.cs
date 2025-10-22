@@ -162,6 +162,20 @@ namespace SocialNetworkMobile.Controllers
             }
         }
 
+        [HttpGet("user/{userId}/shares")]
+        public async Task<ActionResult<List<PostResponse>>> GetSharedPostsByUser(int userId)
+        {
+            try
+            {
+                var posts = await _postService.GetSharedPostsByUserIdAsync(userId);
+                return Ok(posts);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpGet("tag/{tagName}")]
         public async Task<ActionResult<List<PostResponse>>> GetPostsByTag(string tagName)
         {

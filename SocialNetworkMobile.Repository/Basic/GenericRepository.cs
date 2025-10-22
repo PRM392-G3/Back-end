@@ -250,6 +250,16 @@ namespace SocialNetworkMobile.Repository.Basic
             await _context.Set<T>().AddAsync(entity);
         }
 
+        public async Task<int> CountAsync(Expression<Func<T, bool>> predicate)
+        {
+            return await _context.Set<T>().CountAsync(predicate);
+        }
+
+        public async Task<int> CountAsync()
+        {
+            return await _context.Set<T>().CountAsync();
+        }
+
         /// <summary>
         /// Ensures all DateTime properties in the entity are UTC
         /// </summary>

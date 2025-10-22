@@ -55,5 +55,6 @@ namespace SocialNetworkMobile.Repository.Models
         public virtual ICollection<Comment> Comments { get; set; } = new List<Comment>();
         public virtual ICollection<Like> Likes { get; set; } = new List<Like>();
         public virtual ICollection<PostTag> PostTags { get; set; } = new List<PostTag>();
+        public virtual ICollection<Share> Shares { get; set; } = new List<Share>();
     }
 }
