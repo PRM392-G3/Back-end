@@ -570,5 +570,30 @@ namespace SocialNetworkMobile.Services.Services
 
             return responses.OrderByDescending(p => p.CreatedAt).ToList();
         }
+
+        public async Task<List<UserResponse>> GetPostLikesAsync(int postId)
+        {
+            // Check if post exists
+            var post = await _postRepository.GetByIdAsync(postId);
+            if (post == null)
+                throw new ArgumentException("Post not found");
+
+            // Get all likes for this post
+            var likes = await _likeRepository.GetAllAsync(l => l.PostId == postId);
+            
+            if (!likes.Any())
+                return new List<UserResponse>();
+
+            // Get user IDs who liked the post
+            var userIds = likes.Select(l => l.UserId).ToList();
+            
+            // Get users who liked the post
+            var users = await _userRepository.GetAllAsync(u => userIds.Contains(u.Id));
+            
+            // Convert to UserResponse
+            var userResponses = users.Select(u => u.Adapt<UserResponse>()).ToList();
+            
+            return userResponses.OrderByDescending(u => u.CreatedAt).ToList();
+        }
     }
 }

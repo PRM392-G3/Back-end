@@ -15,6 +15,7 @@ namespace SocialNetworkMobile.Services.Interfaces
         Task<bool> DeletePostAsync(int id);
         Task<bool> LikePostAsync(int userId, int postId);
         Task<bool> UnlikePostAsync(int userId, int postId);
+        Task<List<UserResponse>> GetPostLikesAsync(int postId);
         Task<List<PostResponse>> SearchPostsAsync(string searchTerm);
         Task<List<PostResponse>> GetPostsByTagAsync(string tagName);
     }

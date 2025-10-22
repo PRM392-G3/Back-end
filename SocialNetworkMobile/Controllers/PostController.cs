@@ -148,6 +148,21 @@ namespace SocialNetworkMobile.Controllers
             }
         }
 
+        [HttpGet("{postId}/likes")]
+        [Authorize]
+        public async Task<ActionResult<List<UserResponse>>> GetPostLikes(int postId)
+        {
+            try
+            {
+                var users = await _postService.GetPostLikesAsync(postId);
+                return Ok(users);
+            }
+            catch (ArgumentException ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
         [HttpGet("search")]
         public async Task<ActionResult<List<PostResponse>>> SearchPosts([FromQuery] string searchTerm)
         {
