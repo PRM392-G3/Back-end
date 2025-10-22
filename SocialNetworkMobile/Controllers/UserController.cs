@@ -192,5 +192,35 @@ namespace SocialNetworkMobile.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        [HttpGet("search")]
+        [Authorize]
+        public async Task<ActionResult<object>> SearchUsers([FromQuery] string q, [FromQuery] int page = 1, [FromQuery] int limit = 20)
+        {
+            try
+            {
+                var result = await _userService.SearchUsersAsync(q, page, limit);
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("suggested")]
+        [Authorize]
+        public async Task<ActionResult<List<UserResponse>>> GetSuggestedUsers([FromQuery] int limit = 10)
+        {
+            try
+            {
+                var users = await _userService.GetSuggestedUsersAsync(limit);
+                return Ok(users);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }

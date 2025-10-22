@@ -237,5 +237,66 @@ namespace SocialNetworkMobile.Services.Services
 
             return true;
         }
+
+        public async Task<object> SearchUsersAsync(string query, int page, int limit)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                throw new ArgumentException("Search query cannot be empty");
+
+            var skip = (page - 1) * limit;
+            
+            // Search by full name or email
+            var users = await _userRepository.GetAllAsync(u => 
+                u.FullName.Contains(query) || u.Email.Contains(query));
+            
+            var totalCount = users.Count;
+            var paginatedUsers = users
+                .Skip(skip)
+                .Take(limit)
+                .Adapt<List<UserResponse>>();
+            
+            // Add follower/following counts for each user
+            foreach (var user in paginatedUsers)
+            {
+                var followers = await _followRepository.GetAllAsync(f => f.FollowingId == user.Id);
+                var following = await _followRepository.GetAllAsync(f => f.FollowerId == user.Id);
+                user.FollowersCount = followers.Count;
+                user.FollowingCount = following.Count;
+            }
+            
+            var totalPages = (int)Math.Ceiling((double)totalCount / limit);
+            
+            return new
+            {
+                users = paginatedUsers,
+                totalCount,
+                currentPage = page,
+                totalPages
+            };
+        }
+
+        public async Task<List<UserResponse>> GetSuggestedUsersAsync(int limit)
+        {
+            // Get all users except the current user (we'll need to get current user from context)
+            // For now, just return random users
+            var allUsers = await _userRepository.GetAllAsync();
+            
+            // Shuffle and take limit
+            var random = new Random();
+            var shuffledUsers = allUsers.OrderBy(x => random.Next()).Take(limit).ToList();
+            
+            var suggestedUsers = shuffledUsers.Adapt<List<UserResponse>>();
+            
+            // Add follower/following counts for each user
+            foreach (var user in suggestedUsers)
+            {
+                var followers = await _followRepository.GetAllAsync(f => f.FollowingId == user.Id);
+                var following = await _followRepository.GetAllAsync(f => f.FollowerId == user.Id);
+                user.FollowersCount = followers.Count;
+                user.FollowingCount = following.Count;
+            }
+            
+            return suggestedUsers;
+        }
     }
 }

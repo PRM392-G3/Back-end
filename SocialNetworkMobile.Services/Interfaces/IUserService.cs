@@ -21,5 +21,7 @@ namespace SocialNetworkMobile.Services.Interfaces
         Task<bool> IsFollowingAsync(int followerId, int followingId);
         Task<List<AvatarHistory>> GetAvatarHistoryAsync(int userId);
         Task<bool> RestoreAvatarFromHistoryAsync(int userId, int avatarHistoryId);
+        Task<object> SearchUsersAsync(string query, int page, int limit);
+        Task<List<UserResponse>> GetSuggestedUsersAsync(int limit);
     }
 }

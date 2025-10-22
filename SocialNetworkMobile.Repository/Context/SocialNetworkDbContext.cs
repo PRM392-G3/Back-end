@@ -279,6 +279,8 @@ namespace SocialNetworkMobile.Repository.Context
                 entity.Property(e => e.IsPublic).HasColumnName("ispublic").HasDefaultValue(true);
                 entity.Property(e => e.CreatedAt).HasColumnName("createdat").HasDefaultValueSql("CURRENT_TIMESTAMP");
                 // Note: No foreign key constraints as per simplified table design
+            });
+
             // Avatar History
             modelBuilder.Entity<AvatarHistory>(entity =>
             {
