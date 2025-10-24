@@ -89,6 +89,8 @@ namespace SocialNetworkMobile.Services.Services
                 user.Bio = request.Bio;
             if (!string.IsNullOrEmpty(request.AvatarUrl))
                 user.AvatarUrl = request.AvatarUrl;
+            if (!string.IsNullOrEmpty(request.CoverImageUrl))
+                user.CoverImageUrl = request.CoverImageUrl;
             if (!string.IsNullOrEmpty(request.PhoneNumber))
                 user.PhoneNumber = request.PhoneNumber;
             if (request.DateOfBirth.HasValue)
