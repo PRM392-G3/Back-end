@@ -62,15 +62,17 @@ namespace SocialNetworkMobile.Repository.Models
         [Column("UpdatedAt")]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-        // Navigation properties
-        public virtual ICollection<Post> Posts { get; set; } = new List<Post>();
-        public virtual ICollection<Comment> Comments { get; set; } = new List<Comment>();
-        public virtual ICollection<Like> Likes { get; set; } = new List<Like>();
-        public virtual ICollection<Follow> Followers { get; set; } = new List<Follow>();
-        public virtual ICollection<Follow> Following { get; set; } = new List<Follow>();
-        public virtual ICollection<UserSocialProvider> UserSocialProviders { get; set; } = new List<UserSocialProvider>();
-        public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
-        public virtual ICollection<Notification> SentNotifications { get; set; } = new List<Notification>();
-        public virtual ICollection<Share> Shares { get; set; } = new List<Share>();
-    }
+    // Navigation properties
+    public virtual ICollection<Post> Posts { get; set; } = new List<Post>();
+    public virtual ICollection<Comment> Comments { get; set; } = new List<Comment>();
+    public virtual ICollection<Like> Likes { get; set; } = new List<Like>();
+    public virtual ICollection<Follow> Followers { get; set; } = new List<Follow>();
+    public virtual ICollection<Follow> Following { get; set; } = new List<Follow>();
+    public virtual ICollection<Friendship> SentFriendRequests { get; set; } = new List<Friendship>();
+    public virtual ICollection<Friendship> ReceivedFriendRequests { get; set; } = new List<Friendship>();
+    public virtual ICollection<UserSocialProvider> UserSocialProviders { get; set; } = new List<UserSocialProvider>();
+    public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
+    public virtual ICollection<Notification> SentNotifications { get; set; } = new List<Notification>();
+    public virtual ICollection<Share> Shares { get; set; } = new List<Share>();
+}
 }

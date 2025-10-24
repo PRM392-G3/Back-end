@@ -182,6 +182,16 @@ namespace SocialNetworkMobile.Services.Services
             return users.Adapt<List<UserResponse>>();
         }
 
+        public async Task<UserResponse> GetUserByNameAsync(string name)
+        {
+            var user = await _userRepository.GetFirstOrDefaultAsync(u => u.FullName == name);
+            if (user == null)
+                throw new ArgumentException("User not found");
+
+            return user.Adapt<UserResponse>();
+        }
+
+
         public async Task<bool> IsFollowingAsync(int followerId, int followingId)
         {
             var follow = await _followRepository.GetFirstOrDefaultAsync(f => f.FollowerId == followerId && f.FollowingId == followingId);
