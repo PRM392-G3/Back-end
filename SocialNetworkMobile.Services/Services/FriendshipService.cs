@@ -265,18 +265,72 @@ namespace SocialNetworkMobile.Services.Services
                 .Select(f => f.RequesterId == userId ? f.ReceiverId : f.RequesterId)
                 .ToListAsync();
 
-            // Get friends of friends
-            var friendsOfFriends = await _context.Friendships
-                .Where(f => f.Status == FriendshipStatus.Accepted &&
-                           userFriendIds.Contains(f.RequesterId) || userFriendIds.Contains(f.ReceiverId))
-                .Select(f => userFriendIds.Contains(f.RequesterId) ? f.ReceiverId : f.RequesterId)
-                .Where(id => id != userId && !userFriendIds.Contains(id))
-                .Distinct()
-                .Take(limit)
+            // Get pending friend requests (sent and received) to exclude them
+            var pendingRequestIds = await _context.Friendships
+                .Where(f => f.Status == FriendshipStatus.Pending &&
+                           (f.RequesterId == userId || f.ReceiverId == userId))
+                .Select(f => f.RequesterId == userId ? f.ReceiverId : f.RequesterId)
                 .ToListAsync();
 
+            // Get blocked users to exclude them
+            var blockedUserIds = await _context.Friendships
+                .Where(f => f.Status == FriendshipStatus.Blocked &&
+                           (f.RequesterId == userId || f.ReceiverId == userId))
+                .Select(f => f.RequesterId == userId ? f.ReceiverId : f.RequesterId)
+                .ToListAsync();
+
+            List<int> suggestionsIds;
+
+            // If user has friends, get friends of friends
+            if (userFriendIds.Any())
+            {
+                // Get friends of friends
+                var friendsOfFriends = await _context.Friendships
+                    .Where(f => f.Status == FriendshipStatus.Accepted &&
+                               (userFriendIds.Contains(f.RequesterId) || userFriendIds.Contains(f.ReceiverId)))
+                    .Select(f => userFriendIds.Contains(f.RequesterId) ? f.ReceiverId : f.RequesterId)
+                    .Where(id => id != userId && !userFriendIds.Contains(id) && !pendingRequestIds.Contains(id) && !blockedUserIds.Contains(id))
+                    .Distinct()
+                    .Take(limit)
+                    .ToListAsync();
+
+                suggestionsIds = friendsOfFriends;
+            }
+            else
+            {
+                // If user has no friends, suggest random active users
+                suggestionsIds = await _context.Users
+                    .Where(u => u.Id != userId && 
+                               u.IsActive && 
+                               !userFriendIds.Contains(u.Id) && 
+                               !pendingRequestIds.Contains(u.Id) && 
+                               !blockedUserIds.Contains(u.Id))
+                    .OrderBy(u => Guid.NewGuid()) // Random order
+                    .Select(u => u.Id)
+                    .Take(limit)
+                    .ToListAsync();
+            }
+
+            // If we still don't have enough suggestions, fill with random users
+            if (suggestionsIds.Count < limit)
+            {
+                var additionalSuggestions = await _context.Users
+                    .Where(u => u.Id != userId && 
+                               u.IsActive && 
+                               !userFriendIds.Contains(u.Id) && 
+                               !pendingRequestIds.Contains(u.Id) && 
+                               !blockedUserIds.Contains(u.Id) &&
+                               !suggestionsIds.Contains(u.Id))
+                    .OrderBy(u => Guid.NewGuid())
+                    .Select(u => u.Id)
+                    .Take(limit - suggestionsIds.Count)
+                    .ToListAsync();
+
+                suggestionsIds.AddRange(additionalSuggestions);
+            }
+
             var suggestions = await _context.Users
-                .Where(u => friendsOfFriends.Contains(u.Id))
+                .Where(u => suggestionsIds.Contains(u.Id))
                 .ToListAsync();
 
             return suggestions.Select(MapUserToResponse).ToList();

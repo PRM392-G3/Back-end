@@ -170,7 +170,20 @@ namespace SocialNetworkMobile.Services.Services
             var followerIds = followers.Select(f => f.FollowerId).ToList();
             
             var users = await _userRepository.GetAllAsync(u => followerIds.Contains(u.Id));
-            return users.Adapt<List<UserResponse>>();
+            var responses = new List<UserResponse>();
+
+            foreach (var user in users)
+            {
+                var response = user.Adapt<UserResponse>();
+                var userFollowers = await _followRepository.GetAllAsync(f => f.FollowingId == user.Id);
+                var userFollowing = await _followRepository.GetAllAsync(f => f.FollowerId == user.Id);
+                response.FollowersCount = userFollowers.Count;
+                response.FollowingCount = userFollowing.Count;
+                response.IsFollowing = false; // Followers are not following the current user
+                responses.Add(response);
+            }
+
+            return responses;
         }
 
         public async Task<List<UserResponse>> GetFollowingAsync(int userId)
@@ -179,7 +192,20 @@ namespace SocialNetworkMobile.Services.Services
             var followingIds = following.Select(f => f.FollowingId).ToList();
             
             var users = await _userRepository.GetAllAsync(u => followingIds.Contains(u.Id));
-            return users.Adapt<List<UserResponse>>();
+            var responses = new List<UserResponse>();
+
+            foreach (var user in users)
+            {
+                var response = user.Adapt<UserResponse>();
+                var userFollowers = await _followRepository.GetAllAsync(f => f.FollowingId == user.Id);
+                var userFollowing = await _followRepository.GetAllAsync(f => f.FollowerId == user.Id);
+                response.FollowersCount = userFollowers.Count;
+                response.FollowingCount = userFollowing.Count;
+                response.IsFollowing = true; // These are people the current user is following
+                responses.Add(response);
+            }
+
+            return responses;
         }
 
         public async Task<UserResponse> GetUserByNameAsync(string name)
@@ -196,6 +222,58 @@ namespace SocialNetworkMobile.Services.Services
         {
             var follow = await _followRepository.GetFirstOrDefaultAsync(f => f.FollowerId == followerId && f.FollowingId == followingId);
             return follow != null;
+        }
+
+        public async Task<List<UserResponse>> GetFollowersWithStatusAsync(int userId, int currentUserId)
+        {
+            var followers = await _followRepository.GetAllAsync(f => f.FollowingId == userId);
+            var followerIds = followers.Select(f => f.FollowerId).ToList();
+            
+            var users = await _userRepository.GetAllAsync(u => followerIds.Contains(u.Id));
+            var responses = new List<UserResponse>();
+
+            foreach (var user in users)
+            {
+                var response = user.Adapt<UserResponse>();
+                var userFollowers = await _followRepository.GetAllAsync(f => f.FollowingId == user.Id);
+                var userFollowing = await _followRepository.GetAllAsync(f => f.FollowerId == user.Id);
+                response.FollowersCount = userFollowers.Count;
+                response.FollowingCount = userFollowing.Count;
+                
+                // Check if current user is following this user
+                var isFollowing = await _followRepository.GetFirstOrDefaultAsync(f => f.FollowerId == currentUserId && f.FollowingId == user.Id);
+                response.IsFollowing = isFollowing != null;
+                
+                responses.Add(response);
+            }
+
+            return responses;
+        }
+
+        public async Task<List<UserResponse>> GetFollowingWithStatusAsync(int userId, int currentUserId)
+        {
+            var following = await _followRepository.GetAllAsync(f => f.FollowerId == userId);
+            var followingIds = following.Select(f => f.FollowingId).ToList();
+            
+            var users = await _userRepository.GetAllAsync(u => followingIds.Contains(u.Id));
+            var responses = new List<UserResponse>();
+
+            foreach (var user in users)
+            {
+                var response = user.Adapt<UserResponse>();
+                var userFollowers = await _followRepository.GetAllAsync(f => f.FollowingId == user.Id);
+                var userFollowing = await _followRepository.GetAllAsync(f => f.FollowerId == user.Id);
+                response.FollowersCount = userFollowers.Count;
+                response.FollowingCount = userFollowing.Count;
+                
+                // Check if current user is following this user
+                var isFollowing = await _followRepository.GetFirstOrDefaultAsync(f => f.FollowerId == currentUserId && f.FollowingId == user.Id);
+                response.IsFollowing = isFollowing != null;
+                
+                responses.Add(response);
+            }
+
+            return responses;
         }
     }
 }

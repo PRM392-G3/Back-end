@@ -19,5 +19,7 @@ namespace SocialNetworkMobile.Services.Interfaces
         Task<List<UserResponse>> GetFollowersAsync(int userId);
         Task<List<UserResponse>> GetFollowingAsync(int userId);
         Task<bool> IsFollowingAsync(int followerId, int followingId);
+        Task<List<UserResponse>> GetFollowersWithStatusAsync(int userId, int currentUserId);
+        Task<List<UserResponse>> GetFollowingWithStatusAsync(int userId, int currentUserId);
     }
 }
