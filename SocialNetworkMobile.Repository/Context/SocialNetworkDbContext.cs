@@ -57,6 +57,7 @@ namespace SocialNetworkMobile.Repository.Context
                 entity.Property(e => e.PasswordHash).HasColumnName("PasswordHash").HasMaxLength(255);
                 entity.Property(e => e.FullName).HasColumnName("FullName").HasMaxLength(255);
                 entity.Property(e => e.AvatarUrl).HasColumnName("AvatarUrl").HasMaxLength(1024);
+                entity.Property(e => e.CoverImageUrl).HasColumnName("CoverImageUrl").HasMaxLength(1024);
                 entity.Property(e => e.PhoneNumber).HasColumnName("PhoneNumber").HasMaxLength(20);
                 entity.Property(e => e.Bio).HasColumnName("Bio").HasMaxLength(500);
                 entity.Property(e => e.DateOfBirth).HasColumnName("DateOfBirth").HasConversion(
