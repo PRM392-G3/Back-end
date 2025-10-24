@@ -23,6 +23,8 @@ namespace SocialNetworkMobile.Repository.Context
         public virtual DbSet<Like> Likes { get; set; }
         public virtual DbSet<Follow> Follows { get; set; }
         public virtual DbSet<Friendship> Friendships { get; set; }
+        public virtual DbSet<Group> Groups { get; set; }
+        public virtual DbSet<GroupMember> GroupMembers { get; set; }
         public virtual DbSet<Tag> Tags { get; set; }
         public virtual DbSet<PostTag> PostTags { get; set; }
         public virtual DbSet<Notification> Notifications { get; set; }
@@ -283,6 +285,59 @@ namespace SocialNetworkMobile.Repository.Context
                 entity.HasOne(d => d.User).WithMany(p => p.UserSocialProviders)
                     .HasForeignKey(d => d.UserId)
                     .HasConstraintName("fk_user_social_providers_user_id");
+            });
+
+            // Groups
+            modelBuilder.Entity<Group>(entity =>
+            {
+                entity.HasKey(e => e.Id).HasName("pk_groups");
+                entity.ToTable("groups", "public");
+                entity.HasIndex(e => e.Name, "ix_groups_name");
+                entity.HasIndex(e => e.CreatedById, "ix_groups_created_by_id");
+                entity.HasIndex(e => e.Privacy, "ix_groups_privacy");
+                entity.Property(e => e.Id).HasColumnName("Id");
+                entity.Property(e => e.Name).HasColumnName("Name").IsRequired().HasMaxLength(200);
+                entity.Property(e => e.Description).HasColumnName("Description").HasMaxLength(1000);
+                entity.Property(e => e.AvatarUrl).HasColumnName("AvatarUrl").HasMaxLength(1024);
+                entity.Property(e => e.CoverImageUrl).HasColumnName("CoverImageUrl").HasMaxLength(1024);
+                entity.Property(e => e.CreatedById).HasColumnName("CreatedById");
+                entity.Property(e => e.Privacy).HasColumnName("Privacy").IsRequired().HasMaxLength(20).HasDefaultValue("public");
+                entity.Property(e => e.MemberCount).HasColumnName("MemberCount").HasDefaultValue(0);
+                entity.Property(e => e.IsActive).HasColumnName("IsActive").HasDefaultValue(true);
+                entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.UpdatedAt).HasColumnName("UpdatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.HasOne(d => d.CreatedBy).WithMany(p => p.CreatedGroups)
+                    .HasForeignKey(d => d.CreatedById)
+                    .HasConstraintName("fk_groups_created_by_id");
+            });
+
+            // Group Members
+            modelBuilder.Entity<GroupMember>(entity =>
+            {
+                entity.HasKey(e => e.Id).HasName("pk_group_members");
+                entity.ToTable("group_members", "public");
+                entity.HasIndex(e => e.GroupId, "ix_group_members_group_id");
+                entity.HasIndex(e => e.UserId, "ix_group_members_user_id");
+                entity.HasIndex(e => e.Status, "ix_group_members_status");
+                entity.HasIndex(e => new { e.GroupId, e.UserId }, "uq_group_members_group_user").IsUnique();
+                entity.Property(e => e.Id).HasColumnName("Id");
+                entity.Property(e => e.GroupId).HasColumnName("GroupId");
+                entity.Property(e => e.UserId).HasColumnName("UserId");
+                entity.Property(e => e.Role).HasColumnName("Role").IsRequired().HasMaxLength(20).HasDefaultValue("member");
+                entity.Property(e => e.Status).HasColumnName("Status").IsRequired().HasMaxLength(20).HasDefaultValue("active");
+                entity.Property(e => e.JoinedAt).HasColumnName("JoinedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.InvitedById).HasColumnName("InvitedById");
+                entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.UpdatedAt).HasColumnName("UpdatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.HasOne(d => d.Group).WithMany(p => p.Members)
+                    .HasForeignKey(d => d.GroupId)
+                    .HasConstraintName("fk_group_members_group_id");
+                entity.HasOne(d => d.User).WithMany(p => p.GroupMemberships)
+                    .HasForeignKey(d => d.UserId)
+                    .HasConstraintName("fk_group_members_user_id");
+                entity.HasOne(d => d.InvitedBy).WithMany()
+                    .HasForeignKey(d => d.InvitedById)
+                    .HasConstraintName("fk_group_members_invited_by_id");
             });
 
             OnModelCreatingPartial(modelBuilder);
