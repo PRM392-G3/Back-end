@@ -26,8 +26,6 @@ namespace SocialNetworkMobile.Repository.Context
         public virtual DbSet<PostTag> PostTags { get; set; }
         public virtual DbSet<Notification> Notifications { get; set; }
         public virtual DbSet<UserSocialProvider> UserSocialProviders { get; set; }
-        public virtual DbSet<Share> Shares { get; set; }
-        public virtual DbSet<AvatarHistory> AvatarHistories { get; set; }
 
         public static string GetConnectionString(string connectionStringName)
         {
@@ -59,7 +57,6 @@ namespace SocialNetworkMobile.Repository.Context
                 entity.Property(e => e.PasswordHash).HasColumnName("PasswordHash").HasMaxLength(255);
                 entity.Property(e => e.FullName).HasColumnName("FullName").HasMaxLength(255);
                 entity.Property(e => e.AvatarUrl).HasColumnName("AvatarUrl").HasMaxLength(1024);
-                entity.Property(e => e.CoverImageUrl).HasColumnName("CoverImageUrl").HasMaxLength(1024);
                 entity.Property(e => e.PhoneNumber).HasColumnName("PhoneNumber").HasMaxLength(20);
                 entity.Property(e => e.Bio).HasColumnName("Bio").HasMaxLength(500);
                 entity.Property(e => e.DateOfBirth).HasColumnName("DateOfBirth").HasConversion(
@@ -254,49 +251,11 @@ namespace SocialNetworkMobile.Repository.Context
                 entity.Property(e => e.ProviderId).HasColumnName("ProviderId").IsRequired().HasMaxLength(255);
                 entity.Property(e => e.Email).HasColumnName("Email").HasMaxLength(255);
                 entity.Property(e => e.ProfileUrl).HasColumnName("ProfileUrl").HasMaxLength(2048);
-                entity.Property(e => e.CoverImageUrl).HasColumnName("CoverImageUrl").HasMaxLength(1024);
-                entity.Property(e => e.Bio).HasColumnName("Bio").HasMaxLength(500);
                 entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
                 entity.Property(e => e.UpdatedAt).HasColumnName("UpdatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
                 entity.HasOne(d => d.User).WithMany(p => p.UserSocialProviders)
                     .HasForeignKey(d => d.UserId)
                     .HasConstraintName("fk_user_social_providers_user_id");
-            });
-
-            // Shares
-            modelBuilder.Entity<Share>(entity =>
-            {
-                entity.HasKey(e => e.Id).HasName("pk_shares");
-                entity.ToTable("shares", "public");
-                entity.HasIndex(e => e.UserId, "ix_shares_user_id");
-                entity.HasIndex(e => e.PostId, "ix_shares_post_id");
-                entity.HasIndex(e => e.CreatedAt, "ix_shares_created_at");
-                entity.HasIndex(e => e.IsPublic, "ix_shares_is_public");
-                entity.Property(e => e.Id).HasColumnName("id");
-                entity.Property(e => e.UserId).HasColumnName("userid");
-                entity.Property(e => e.PostId).HasColumnName("postid");
-                entity.Property(e => e.Caption).HasColumnName("caption").HasMaxLength(500);
-                entity.Property(e => e.IsPublic).HasColumnName("ispublic").HasDefaultValue(true);
-                entity.Property(e => e.CreatedAt).HasColumnName("createdat").HasDefaultValueSql("CURRENT_TIMESTAMP");
-                // Note: No foreign key constraints as per simplified table design
-            });
-
-            // Avatar History
-            modelBuilder.Entity<AvatarHistory>(entity =>
-            {
-                entity.HasKey(e => e.Id).HasName("pk_avatar_history");
-                entity.ToTable("avatar_history", "public");
-                entity.HasIndex(e => e.UserId, "ix_avatar_history_user_id");
-                entity.HasIndex(e => e.CreatedAt, "ix_avatar_history_created_at");
-                entity.Property(e => e.Id).HasColumnName("Id");
-                entity.Property(e => e.UserId).HasColumnName("UserId");
-                entity.Property(e => e.AvatarUrl).HasColumnName("AvatarUrl").IsRequired().HasMaxLength(500);
-                entity.Property(e => e.CoverImageUrl).HasColumnName("CoverImageUrl").IsRequired().HasMaxLength(500);
-                entity.Property(e => e.Description).HasColumnName("Description").HasMaxLength(200);
-                entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
-                entity.HasOne(d => d.User).WithMany()
-                    .HasForeignKey(d => d.UserId)
-                    .HasConstraintName("fk_avatar_history_user_id");
             });
 
             OnModelCreatingPartial(modelBuilder);

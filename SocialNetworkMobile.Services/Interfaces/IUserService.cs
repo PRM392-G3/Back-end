@@ -1,6 +1,5 @@
 using SocialNetworkMobile.Services.Object.Requests;
 using SocialNetworkMobile.Services.Object.Responses;
-using SocialNetworkMobile.Repository.Models;
 
 namespace SocialNetworkMobile.Services.Interfaces
 {
@@ -19,9 +18,5 @@ namespace SocialNetworkMobile.Services.Interfaces
         Task<List<UserResponse>> GetFollowersAsync(int userId);
         Task<List<UserResponse>> GetFollowingAsync(int userId);
         Task<bool> IsFollowingAsync(int followerId, int followingId);
-        Task<List<AvatarHistory>> GetAvatarHistoryAsync(int userId);
-        Task<bool> RestoreAvatarFromHistoryAsync(int userId, int avatarHistoryId);
-        Task<object> SearchUsersAsync(string query, int page, int limit);
-        Task<List<UserResponse>> GetSuggestedUsersAsync(int limit);
     }
 }

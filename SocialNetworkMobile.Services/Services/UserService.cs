@@ -13,13 +13,11 @@ namespace SocialNetworkMobile.Services.Services
     {
         private readonly GenericRepository<User> _userRepository;
         private readonly GenericRepository<Follow> _followRepository;
-        private readonly GenericRepository<AvatarHistory> _avatarHistoryRepository;
 
-        public UserService(GenericRepository<User> userRepository, GenericRepository<Follow> followRepository, GenericRepository<AvatarHistory> avatarHistoryRepository)
+        public UserService(GenericRepository<User> userRepository, GenericRepository<Follow> followRepository)
         {
             _userRepository = userRepository;
             _followRepository = followRepository;
-            _avatarHistoryRepository = avatarHistoryRepository;
         }
 
         public async Task<UserResponse> CreateUserAsync(CreateUserRequest request)
@@ -85,25 +83,10 @@ namespace SocialNetworkMobile.Services.Services
             if (user == null)
                 throw new ArgumentException("User not found");
 
-            if (!string.IsNullOrEmpty(request.AvatarUrl) && !string.IsNullOrEmpty(user.AvatarUrl) && user.AvatarUrl != request.AvatarUrl)
-            {
-                var avatarHistory = new AvatarHistory
-                {
-                    UserId = user.Id,
-                    AvatarUrl = user.AvatarUrl,
-                    CoverImageUrl = user.CoverImageUrl ?? string.Empty,
-                    CreatedAt = DateTime.UtcNow,
-                    Description = "Previous avatar before update"
-                };
-                await _avatarHistoryRepository.CreateAsync(avatarHistory);
-            }
-
             if (!string.IsNullOrEmpty(request.FullName))
                 user.FullName = request.FullName;
             if (!string.IsNullOrEmpty(request.Bio))
                 user.Bio = request.Bio;
-            if (!string.IsNullOrEmpty(request.CoverImageUrl))
-                user.CoverImageUrl = request.CoverImageUrl;
             if (!string.IsNullOrEmpty(request.AvatarUrl))
                 user.AvatarUrl = request.AvatarUrl;
             if (!string.IsNullOrEmpty(request.PhoneNumber))
@@ -201,102 +184,6 @@ namespace SocialNetworkMobile.Services.Services
         {
             var follow = await _followRepository.GetFirstOrDefaultAsync(f => f.FollowerId == followerId && f.FollowingId == followingId);
             return follow != null;
-        }
-
-        public async Task<List<AvatarHistory>> GetAvatarHistoryAsync(int userId)
-        {
-            var avatarHistory = await _avatarHistoryRepository.GetAllAsync(ah => ah.UserId == userId);
-            return avatarHistory.OrderByDescending(ah => ah.CreatedAt).ToList();
-        }
-
-        public async Task<bool> RestoreAvatarFromHistoryAsync(int userId, int avatarHistoryId)
-        {
-            var avatarHistory = await _avatarHistoryRepository.GetByIdAsync(avatarHistoryId);
-            if (avatarHistory == null || avatarHistory.UserId != userId)
-                return false;
-
-            var user = await _userRepository.GetByIdAsync(userId);
-            if (user == null)
-                return false;
-
-            if (!string.IsNullOrEmpty(user.AvatarUrl))
-            {
-                var currentAvatarHistory = new AvatarHistory
-                {
-                    UserId = user.Id,
-                    AvatarUrl = user.AvatarUrl,
-                    CreatedAt = DateTime.UtcNow,
-                    Description = "Avatar before restore from history"
-                };
-                await _avatarHistoryRepository.CreateAsync(currentAvatarHistory);
-            }
-
-            user.AvatarUrl = avatarHistory.AvatarUrl;
-            user.UpdatedAt = DateTime.UtcNow;
-            await _userRepository.UpdateAsync(user);
-
-            return true;
-        }
-
-        public async Task<object> SearchUsersAsync(string query, int page, int limit)
-        {
-            if (string.IsNullOrWhiteSpace(query))
-                throw new ArgumentException("Search query cannot be empty");
-
-            var skip = (page - 1) * limit;
-            
-            // Search by full name or email
-            var users = await _userRepository.GetAllAsync(u => 
-                u.FullName.Contains(query) || u.Email.Contains(query));
-            
-            var totalCount = users.Count;
-            var paginatedUsers = users
-                .Skip(skip)
-                .Take(limit)
-                .Adapt<List<UserResponse>>();
-            
-            // Add follower/following counts for each user
-            foreach (var user in paginatedUsers)
-            {
-                var followers = await _followRepository.GetAllAsync(f => f.FollowingId == user.Id);
-                var following = await _followRepository.GetAllAsync(f => f.FollowerId == user.Id);
-                user.FollowersCount = followers.Count;
-                user.FollowingCount = following.Count;
-            }
-            
-            var totalPages = (int)Math.Ceiling((double)totalCount / limit);
-            
-            return new
-            {
-                users = paginatedUsers,
-                totalCount,
-                currentPage = page,
-                totalPages
-            };
-        }
-
-        public async Task<List<UserResponse>> GetSuggestedUsersAsync(int limit)
-        {
-            // Get all users except the current user (we'll need to get current user from context)
-            // For now, just return random users
-            var allUsers = await _userRepository.GetAllAsync();
-            
-            // Shuffle and take limit
-            var random = new Random();
-            var shuffledUsers = allUsers.OrderBy(x => random.Next()).Take(limit).ToList();
-            
-            var suggestedUsers = shuffledUsers.Adapt<List<UserResponse>>();
-            
-            // Add follower/following counts for each user
-            foreach (var user in suggestedUsers)
-            {
-                var followers = await _followRepository.GetAllAsync(f => f.FollowingId == user.Id);
-                var following = await _followRepository.GetAllAsync(f => f.FollowerId == user.Id);
-                user.FollowersCount = followers.Count;
-                user.FollowingCount = following.Count;
-            }
-            
-            return suggestedUsers;
         }
     }
 }
