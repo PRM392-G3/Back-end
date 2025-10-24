@@ -1,45 +1,40 @@
-using SocialNetworkMobile.Repository.Basic;
+using Mapster;
+using Microsoft.EntityFrameworkCore;
+using SocialNetworkMobile.Repository.Context;
 using SocialNetworkMobile.Repository.Models;
 using SocialNetworkMobile.Services.Interfaces;
 using SocialNetworkMobile.Services.Object.Requests;
 using SocialNetworkMobile.Services.Object.Responses;
-using Mapster;
 
 namespace SocialNetworkMobile.Services.Services
 {
     public class ShareService : IShareService
     {
-        private readonly GenericRepository<Share> _shareRepository;
-        private readonly GenericRepository<Post> _postRepository;
-        private readonly GenericRepository<User> _userRepository;
+        private readonly SocialNetworkDbContext _context;
 
-        public ShareService(
-            GenericRepository<Share> shareRepository,
-            GenericRepository<Post> postRepository,
-            GenericRepository<User> userRepository)
+        public ShareService(SocialNetworkDbContext context)
         {
-            _shareRepository = shareRepository;
-            _postRepository = postRepository;
-            _userRepository = userRepository;
+            _context = context;
         }
 
         public async Task<ShareResponse> SharePostAsync(SharePostRequest request)
         {
-            // Check if user has already shared this post
-            var existingShare = await _shareRepository.GetFirstOrDefaultAsync(
-                s => s.UserId == request.UserId && s.PostId == request.PostId);
-
-            if (existingShare != null)
-            {
-                throw new InvalidOperationException("User has already shared this post");
-            }
-
-            // Verify post exists
-            var post = await _postRepository.GetByIdAsync(request.PostId);
+            // Check if post exists
+            var post = await _context.Posts.FindAsync(request.PostId);
             if (post == null)
-            {
                 throw new ArgumentException("Post not found");
-            }
+
+            // Check if user exists
+            var user = await _context.Users.FindAsync(request.UserId);
+            if (user == null)
+                throw new ArgumentException("User not found");
+
+            // Check if already shared
+            var existingShare = await _context.Shares
+                .FirstOrDefaultAsync(s => s.UserId == request.UserId && s.PostId == request.PostId);
+            
+            if (existingShare != null)
+                throw new InvalidOperationException("Post already shared by this user");
 
             // Create new share
             var share = new Share
@@ -51,86 +46,63 @@ namespace SocialNetworkMobile.Services.Services
                 CreatedAt = DateTime.UtcNow
             };
 
-            await _shareRepository.CreateAsync(share);
+            _context.Shares.Add(share);
+            await _context.SaveChangesAsync();
 
-            // Update share count in Post table
-            post.ShareCount = await _shareRepository.CountAsync(s => s.PostId == request.PostId);
-            await _postRepository.UpdateAsync(post);
-
-            // Get user info for response
-            var user = await _userRepository.GetByIdAsync(request.UserId);
-            
+            // Return response with user and post info
             var response = share.Adapt<ShareResponse>();
             response.User = user.Adapt<UserResponse>();
+            response.Post = post.Adapt<PostResponse>();
 
             return response;
         }
 
         public async Task<bool> UnsharePostAsync(int userId, int postId)
         {
-            var share = await _shareRepository.GetFirstOrDefaultAsync(
-                s => s.UserId == userId && s.PostId == postId);
-
+            var share = await _context.Shares
+                .FirstOrDefaultAsync(s => s.UserId == userId && s.PostId == postId);
+            
             if (share == null)
-            {
                 return false;
-            }
 
-            await _shareRepository.DeleteAsync(share);
-
-            // Update share count in Post table
-            var post = await _postRepository.GetByIdAsync(postId);
-            if (post != null)
-            {
-                post.ShareCount = await _shareRepository.CountAsync(s => s.PostId == postId);
-                await _postRepository.UpdateAsync(post);
-            }
-
+            _context.Shares.Remove(share);
+            await _context.SaveChangesAsync();
             return true;
         }
 
-        public async Task<List<ShareResponse>> GetSharesByPostAsync(int postId)
+        public async Task<bool> IsPostSharedByUserAsync(int userId, int postId)
         {
-            var shares = await _shareRepository.GetAllAsync(s => s.PostId == postId);
-            var responses = new List<ShareResponse>();
-
-            foreach (var share in shares)
-            {
-                var user = await _userRepository.GetByIdAsync(share.UserId);
-                var response = share.Adapt<ShareResponse>();
-                response.User = user.Adapt<UserResponse>();
-                responses.Add(response);
-            }
-
-            return responses.OrderByDescending(s => s.CreatedAt).ToList();
+            return await _context.Shares
+                .AnyAsync(s => s.UserId == userId && s.PostId == postId);
         }
 
-        public async Task<List<ShareResponse>> GetSharesByUserAsync(int userId)
+        public async Task<List<ShareResponse>> GetPostSharesAsync(int postId)
         {
-            var shares = await _shareRepository.GetAllAsync(s => s.UserId == userId);
-            var responses = new List<ShareResponse>();
+            var shares = await _context.Shares
+                .Include(s => s.User)
+                .Include(s => s.Post)
+                .Where(s => s.PostId == postId)
+                .OrderByDescending(s => s.CreatedAt)
+                .ToListAsync();
 
-            foreach (var share in shares)
-            {
-                var user = await _userRepository.GetByIdAsync(share.UserId);
-                var response = share.Adapt<ShareResponse>();
-                response.User = user.Adapt<UserResponse>();
-                responses.Add(response);
-            }
-
-            return responses.OrderByDescending(s => s.CreatedAt).ToList();
+            return shares.Adapt<List<ShareResponse>>();
         }
 
-        public async Task<bool> HasUserSharedPostAsync(int userId, int postId)
+        public async Task<List<ShareResponse>> GetUserSharesAsync(int userId)
         {
-            var share = await _shareRepository.GetFirstOrDefaultAsync(
-                s => s.UserId == userId && s.PostId == postId);
-            return share != null;
+            var shares = await _context.Shares
+                .Include(s => s.User)
+                .Include(s => s.Post)
+                .Where(s => s.UserId == userId)
+                .OrderByDescending(s => s.CreatedAt)
+                .ToListAsync();
+
+            return shares.Adapt<List<ShareResponse>>();
         }
 
-        public async Task<int> GetShareCountAsync(int postId)
+        public async Task<int> GetPostShareCountAsync(int postId)
         {
-            return await _shareRepository.CountAsync(s => s.PostId == postId);
+            return await _context.Shares.CountAsync(s => s.PostId == postId);
         }
     }
 }

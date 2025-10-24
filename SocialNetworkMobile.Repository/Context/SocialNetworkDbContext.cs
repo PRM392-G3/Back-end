@@ -27,6 +27,7 @@ namespace SocialNetworkMobile.Repository.Context
         public virtual DbSet<PostTag> PostTags { get; set; }
         public virtual DbSet<Notification> Notifications { get; set; }
         public virtual DbSet<UserSocialProvider> UserSocialProviders { get; set; }
+        public virtual DbSet<Share> Shares { get; set; }
 
         public static string GetConnectionString(string connectionStringName)
         {
@@ -283,6 +284,28 @@ namespace SocialNetworkMobile.Repository.Context
                 entity.HasOne(d => d.User).WithMany(p => p.UserSocialProviders)
                     .HasForeignKey(d => d.UserId)
                     .HasConstraintName("fk_user_social_providers_user_id");
+            });
+
+            // Shares
+            modelBuilder.Entity<Share>(entity =>
+            {
+                entity.HasKey(e => e.Id).HasName("pk_shares");
+                entity.ToTable("shares", "public");
+                entity.HasIndex(e => e.UserId, "ix_shares_user_id");
+                entity.HasIndex(e => e.PostId, "ix_shares_post_id");
+                entity.HasIndex(e => new { e.UserId, e.PostId }, "uq_shares_user_post").IsUnique();
+                entity.Property(e => e.Id).HasColumnName("Id");
+                entity.Property(e => e.UserId).HasColumnName("UserId");
+                entity.Property(e => e.PostId).HasColumnName("PostId");
+                entity.Property(e => e.Caption).HasColumnName("Caption").HasMaxLength(500);
+                entity.Property(e => e.IsPublic).HasColumnName("IsPublic").HasDefaultValue(true);
+                entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.HasOne(d => d.User).WithMany(p => p.Shares)
+                    .HasForeignKey(d => d.UserId)
+                    .HasConstraintName("fk_shares_user_id");
+                entity.HasOne(d => d.Post).WithMany(p => p.Shares)
+                    .HasForeignKey(d => d.PostId)
+                    .HasConstraintName("fk_shares_post_id");
             });
 
             OnModelCreatingPartial(modelBuilder);

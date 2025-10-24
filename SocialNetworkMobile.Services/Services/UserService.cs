@@ -208,13 +208,25 @@ namespace SocialNetworkMobile.Services.Services
             return responses;
         }
 
-        public async Task<UserResponse> GetUserByNameAsync(string name)
+        public async Task<List<UserResponse>> GetUserByNameAsync(string name)
         {
-            var user = await _userRepository.GetFirstOrDefaultAsync(u => u.FullName == name);
-            if (user == null)
-                throw new ArgumentException("User not found");
+            // Fuzzy search - tìm users có tên chứa từ khóa tìm kiếm
+            var users = await _userRepository.GetAllAsync(u => 
+                u.FullName.ToLower().Contains(name.ToLower()) && u.IsActive);
 
-            return user.Adapt<UserResponse>();
+            var responses = new List<UserResponse>();
+            foreach (var user in users)
+            {
+                var response = user.Adapt<UserResponse>();
+                var userFollowers = await _followRepository.GetAllAsync(f => f.FollowingId == user.Id);
+                var userFollowing = await _followRepository.GetAllAsync(f => f.FollowerId == user.Id);
+                response.FollowersCount = userFollowers.Count;
+                response.FollowingCount = userFollowing.Count;
+                response.IsFollowing = false; // Default for search results
+                responses.Add(response);
+            }
+
+            return responses;
         }
 
 

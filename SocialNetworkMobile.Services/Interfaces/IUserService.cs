@@ -7,7 +7,7 @@ namespace SocialNetworkMobile.Services.Interfaces
     {
         Task<UserResponse> CreateUserAsync(CreateUserRequest request);
         Task<UserResponse> GetUserByIdAsync(int id);
-        Task<UserResponse> GetUserByNameAsync(string name);
+        Task<List<UserResponse>> GetUserByNameAsync(string name);
         Task<UserResponse> GetUserByEmailAsync(string email);
         Task<List<UserResponse>> GetAllUsersAsync();
         Task<UserResponse> UpdateUserAsync(int id, UpdateUserRequest request);

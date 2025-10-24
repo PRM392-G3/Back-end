@@ -51,14 +51,19 @@ namespace SocialNetworkMobile.Controllers
         /// Search users by name (case-insensitive)
         /// </summary>
         [HttpGet("search")]
-        public async Task<ActionResult<List<UserResponse>>> SearchUsersByName([FromQuery] string name)
+        public async Task<ActionResult<List<UserResponse>>> SearchUsersByName([FromQuery] string name, [FromQuery] int page = 1, [FromQuery] int limit = 20)
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    return BadRequest(new { error = "Search query is required" });
+                }
+
                 var users = await _userService.GetUserByNameAsync(name);
 
-                if (users == null)
-                    return NotFound(new { message = "User not found" });
+                if (users == null || !users.Any())
+                    return Ok(new List<UserResponse>()); // Return empty list instead of NotFound
 
                 return Ok(users);
             }

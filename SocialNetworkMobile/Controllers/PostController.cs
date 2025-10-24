@@ -53,12 +53,36 @@ namespace SocialNetworkMobile.Controllers
             return Ok(posts);
         }
 
+        [HttpGet("with-likes")]
+        [Authorize]
+        public async Task<ActionResult<List<PostResponse>>> GetAllPostsWithLikes()
+        {
+            try
+            {
+                var currentUserId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+                if (currentUserId == 0)
+                    return Unauthorized(new { error = "Invalid user token" });
+
+                var posts = await _postService.GetAllPostsWithLikesAsync(currentUserId);
+                return Ok(posts);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpGet("user/{userId}")]
+        [Authorize]
         public async Task<ActionResult<List<PostResponse>>> GetPostsByUser(int userId)
         {
             try
             {
-                var posts = await _postService.GetPostsByUserIdAsync(userId);
+                var currentUserId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+                if (currentUserId == 0)
+                    return Unauthorized(new { error = "Invalid user token" });
+
+                var posts = await _postService.GetPostsByUserIdWithLikesAsync(userId, currentUserId);
                 return Ok(posts);
             }
             catch (ArgumentException ex)
@@ -178,11 +202,16 @@ namespace SocialNetworkMobile.Controllers
         }
 
         [HttpGet("user/{userId}/shares")]
+        [Authorize]
         public async Task<ActionResult<List<PostResponse>>> GetSharedPostsByUser(int userId)
         {
             try
             {
-                var posts = await _postService.GetSharedPostsByUserIdAsync(userId);
+                var currentUserId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+                if (currentUserId == 0)
+                    return Unauthorized(new { error = "Invalid user token" });
+
+                var posts = await _postService.GetSharedPostsByUserIdWithLikesAsync(userId, currentUserId);
                 return Ok(posts);
             }
             catch (ArgumentException ex)

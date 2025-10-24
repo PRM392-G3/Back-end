@@ -203,6 +203,8 @@ namespace SocialNetworkMobile.Services.Services
                     });
                 }
                 response.Likes = likeResponses;
+                response.LikeCount = likeResponses.Count;
+                response.IsLiked = false; // Default for GetAllPosts - no current user context
                 
                 // Get comments with user info
                 var comments = await _commentRepository.GetAllAsync(c => c.PostId == post.Id);
@@ -296,6 +298,94 @@ namespace SocialNetworkMobile.Services.Services
             return responses.OrderByDescending(p => p.CreatedAt).ToList();
         }
 
+        public async Task<List<PostResponse>> GetPostsByUserIdWithLikesAsync(int userId, int currentUserId)
+        {
+            var posts = await _postRepository.GetAllAsync(p => p.UserId == userId && p.IsDeleted == false);
+            var responses = new List<PostResponse>();
+
+            foreach (var post in posts)
+            {
+                var response = post.Adapt<PostResponse>();
+                
+                // Get user info
+                var user = await _userRepository.GetByIdAsync(post.UserId);
+                response.User = user.Adapt<UserResponse>();
+
+                // Get tags
+                var postTags = await _postTagRepository.GetAllAsync(pt => pt.PostId == post.Id);
+                var tagIds = postTags.Select(pt => pt.TagId).ToList();
+                var tags = await _tagRepository.GetAllAsync(t => tagIds.Contains(t.Id));
+                response.Tags = tags.Adapt<List<TagResponse>>();
+
+                // Get likes with user info
+                var likes = await _likeRepository.GetAllAsync(l => l.PostId == post.Id);
+                var likeResponses = new List<LikeResponse>();
+                foreach (var like in likes)
+                {
+                    var likeUser = await _userRepository.GetByIdAsync(like.UserId);
+                    likeResponses.Add(new LikeResponse
+                    {
+                        Id = like.Id,
+                        PostId = like.PostId ?? 0,
+                        UserId = like.UserId,
+                        LikeType = like.LikeType,
+                        CreatedAt = like.CreatedAt,
+                        User = likeUser.Adapt<UserResponse>()
+                    });
+                }
+                response.Likes = likeResponses;
+                response.LikeCount = likeResponses.Count;
+                
+                // Check if current user has liked this post
+                response.IsLiked = await _likeRepository.GetAllAsync(l => l.PostId == post.Id && l.UserId == currentUserId).ContinueWith(t => t.Result.Any());
+                
+                // Get comments with user info
+                var comments = await _commentRepository.GetAllAsync(c => c.PostId == post.Id);
+                var commentResponses = new List<CommentResponse>();
+                foreach (var comment in comments)
+                {
+                    var commentUser = await _userRepository.GetByIdAsync(comment.UserId);
+                    commentResponses.Add(new CommentResponse
+                    {
+                        Id = comment.Id,
+                        PostId = comment.PostId,
+                        UserId = comment.UserId,
+                        Content = comment.Content,
+                        ParentCommentId = comment.ParentCommentId ?? 0,
+                        CreatedAt = comment.CreatedAt,
+                        User = commentUser.Adapt<UserResponse>()
+                    });
+                }
+                response.Comments = commentResponses;
+                response.CommentCount = commentResponses.Count;
+
+                // Get shares with user info
+                var shares = await _shareRepository.GetAllAsync(s => s.PostId == post.Id);
+                var shareResponses = new List<ShareResponse>();
+                foreach (var share in shares)
+                {
+                    var shareUser = await _userRepository.GetByIdAsync(share.UserId);
+                    shareResponses.Add(new ShareResponse
+                    {
+                        Id = share.Id,
+                        PostId = share.PostId,
+                        UserId = share.UserId,
+                        Caption = share.Caption,
+                        IsPublic = share.IsPublic,
+                        CreatedAt = share.CreatedAt,
+                        User = shareUser.Adapt<UserResponse>()
+                    });
+                }
+                response.Shares = shareResponses;
+                response.ShareCount = shareResponses.Count;
+                response.IsShared = await _shareRepository.GetAllAsync(s => s.PostId == post.Id && s.UserId == currentUserId).ContinueWith(t => t.Result.Any());
+
+                responses.Add(response);
+            }
+
+            return responses.OrderByDescending(p => p.CreatedAt).ToList();
+        }
+
         public async Task<List<PostResponse>> GetSharedPostsByUserIdAsync(int userId)
         {
             // Get all shares by user
@@ -341,6 +431,102 @@ namespace SocialNetworkMobile.Services.Services
                     });
                 }
                 response.Shares = shareResponses;
+
+                responses.Add(response);
+            }
+
+            return responses.OrderByDescending(p => p.CreatedAt).ToList();
+        }
+
+        public async Task<List<PostResponse>> GetSharedPostsByUserIdWithLikesAsync(int userId, int currentUserId)
+        {
+            // Get all shares by user
+            var shares = await _shareRepository.GetAllAsync(s => s.UserId == userId);
+            var postIds = shares.Select(s => s.PostId).ToList();
+            
+            if (!postIds.Any())
+                return new List<PostResponse>();
+
+            // Get posts that were shared
+            var posts = await _postRepository.GetAllAsync(p => postIds.Contains(p.Id) && p.IsDeleted == false);
+            var responses = new List<PostResponse>();
+
+            foreach (var post in posts)
+            {
+                var response = post.Adapt<PostResponse>();
+                
+                // Get user info
+                var user = await _userRepository.GetByIdAsync(post.UserId);
+                response.User = user.Adapt<UserResponse>();
+
+                // Get tags
+                var postTags = await _postTagRepository.GetAllAsync(pt => pt.PostId == post.Id);
+                var tagIds = postTags.Select(pt => pt.TagId).ToList();
+                var tags = await _tagRepository.GetAllAsync(t => tagIds.Contains(t.Id));
+                response.Tags = tags.Adapt<List<TagResponse>>();
+
+                // Get likes with user info
+                var likes = await _likeRepository.GetAllAsync(l => l.PostId == post.Id);
+                var likeResponses = new List<LikeResponse>();
+                foreach (var like in likes)
+                {
+                    var likeUser = await _userRepository.GetByIdAsync(like.UserId);
+                    likeResponses.Add(new LikeResponse
+                    {
+                        Id = like.Id,
+                        PostId = like.PostId ?? 0,
+                        UserId = like.UserId,
+                        LikeType = like.LikeType,
+                        CreatedAt = like.CreatedAt,
+                        User = likeUser.Adapt<UserResponse>()
+                    });
+                }
+                response.Likes = likeResponses;
+                response.LikeCount = likeResponses.Count;
+                
+                // Check if current user has liked this post
+                response.IsLiked = await _likeRepository.GetAllAsync(l => l.PostId == post.Id && l.UserId == currentUserId).ContinueWith(t => t.Result.Any());
+                
+                // Get comments with user info
+                var comments = await _commentRepository.GetAllAsync(c => c.PostId == post.Id);
+                var commentResponses = new List<CommentResponse>();
+                foreach (var comment in comments)
+                {
+                    var commentUser = await _userRepository.GetByIdAsync(comment.UserId);
+                    commentResponses.Add(new CommentResponse
+                    {
+                        Id = comment.Id,
+                        PostId = comment.PostId,
+                        UserId = comment.UserId,
+                        Content = comment.Content,
+                        ParentCommentId = comment.ParentCommentId ?? 0,
+                        CreatedAt = comment.CreatedAt,
+                        User = commentUser.Adapt<UserResponse>()
+                    });
+                }
+                response.Comments = commentResponses;
+                response.CommentCount = commentResponses.Count;
+
+                // Get shares with user info
+                var postShares = await _shareRepository.GetAllAsync(s => s.PostId == post.Id);
+                var shareResponses = new List<ShareResponse>();
+                foreach (var share in postShares)
+                {
+                    var shareUser = await _userRepository.GetByIdAsync(share.UserId);
+                    shareResponses.Add(new ShareResponse
+                    {
+                        Id = share.Id,
+                        PostId = share.PostId,
+                        UserId = share.UserId,
+                        Caption = share.Caption,
+                        IsPublic = share.IsPublic,
+                        CreatedAt = share.CreatedAt,
+                        User = shareUser.Adapt<UserResponse>()
+                    });
+                }
+                response.Shares = shareResponses;
+                response.ShareCount = shareResponses.Count;
+                response.IsShared = await _shareRepository.GetAllAsync(s => s.PostId == post.Id && s.UserId == currentUserId).ContinueWith(t => t.Result.Any());
 
                 responses.Add(response);
             }
@@ -594,6 +780,94 @@ namespace SocialNetworkMobile.Services.Services
             var userResponses = users.Select(u => u.Adapt<UserResponse>()).ToList();
             
             return userResponses.OrderByDescending(u => u.CreatedAt).ToList();
+        }
+
+        public async Task<List<PostResponse>> GetAllPostsWithLikesAsync(int currentUserId)
+        {
+            var posts = await _postRepository.GetAllAsync(p => p.IsDeleted == false && p.IsPublic == true);
+            var responses = new List<PostResponse>();
+
+            foreach (var post in posts)
+            {
+                var response = post.Adapt<PostResponse>();
+                
+                // Get user info
+                var user = await _userRepository.GetByIdAsync(post.UserId);
+                response.User = user.Adapt<UserResponse>();
+
+                // Get tags
+                var postTags = await _postTagRepository.GetAllAsync(pt => pt.PostId == post.Id);
+                var tagIds = postTags.Select(pt => pt.TagId).ToList();
+                var tags = await _tagRepository.GetAllAsync(t => tagIds.Contains(t.Id));
+                response.Tags = tags.Adapt<List<TagResponse>>();
+
+                // Get likes with user info
+                var likes = await _likeRepository.GetAllAsync(l => l.PostId == post.Id);
+                var likeResponses = new List<LikeResponse>();
+                foreach (var like in likes)
+                {
+                    var likeUser = await _userRepository.GetByIdAsync(like.UserId);
+                    likeResponses.Add(new LikeResponse
+                    {
+                        Id = like.Id,
+                        PostId = like.PostId ?? 0,
+                        UserId = like.UserId,
+                        LikeType = like.LikeType,
+                        CreatedAt = like.CreatedAt,
+                        User = likeUser.Adapt<UserResponse>()
+                    });
+                }
+                response.Likes = likeResponses;
+                response.LikeCount = likeResponses.Count;
+                
+                // Check if current user has liked this post
+                response.IsLiked = await _likeRepository.GetAllAsync(l => l.PostId == post.Id && l.UserId == currentUserId).ContinueWith(t => t.Result.Any());
+                
+                // Get comments with user info
+                var comments = await _commentRepository.GetAllAsync(c => c.PostId == post.Id);
+                var commentResponses = new List<CommentResponse>();
+                foreach (var comment in comments)
+                {
+                    var commentUser = await _userRepository.GetByIdAsync(comment.UserId);
+                    commentResponses.Add(new CommentResponse
+                    {
+                        Id = comment.Id,
+                        PostId = comment.PostId,
+                        UserId = comment.UserId,
+                        Content = comment.Content,
+                        ParentCommentId = comment.ParentCommentId ?? 0,
+                        CreatedAt = comment.CreatedAt,
+                        User = commentUser.Adapt<UserResponse>()
+                    });
+                }
+                response.Comments = commentResponses;
+                response.CommentCount = commentResponses.Count;
+
+                // Get shares
+                var shares = await _shareRepository.GetAllAsync(s => s.PostId == post.Id);
+                var shareResponses = new List<ShareResponse>();
+                foreach (var share in shares)
+                {
+                    var shareUser = await _userRepository.GetByIdAsync(share.UserId);
+                    shareResponses.Add(new ShareResponse
+                    {
+                        Id = share.Id,
+                        PostId = share.PostId,
+                        UserId = share.UserId,
+                        Caption = share.Caption,
+                        IsPublic = share.IsPublic,
+                        CreatedAt = share.CreatedAt,
+                        User = shareUser.Adapt<UserResponse>()
+                    });
+                }
+                response.Shares = shareResponses;
+                response.ShareCount = shareResponses.Count;
+                response.IsShared = await _shareRepository.GetAllAsync(s => s.PostId == post.Id && s.UserId == currentUserId).ContinueWith(t => t.Result.Any());
+
+                responses.Add(response);
+            }
+
+            return responses;
         }
     }
 }

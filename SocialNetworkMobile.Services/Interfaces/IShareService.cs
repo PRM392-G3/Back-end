@@ -7,9 +7,9 @@ namespace SocialNetworkMobile.Services.Interfaces
     {
         Task<ShareResponse> SharePostAsync(SharePostRequest request);
         Task<bool> UnsharePostAsync(int userId, int postId);
-        Task<List<ShareResponse>> GetSharesByPostAsync(int postId);
-        Task<List<ShareResponse>> GetSharesByUserAsync(int userId);
-        Task<bool> HasUserSharedPostAsync(int userId, int postId);
-        Task<int> GetShareCountAsync(int postId);
+        Task<bool> IsPostSharedByUserAsync(int userId, int postId);
+        Task<List<ShareResponse>> GetPostSharesAsync(int postId);
+        Task<List<ShareResponse>> GetUserSharesAsync(int userId);
+        Task<int> GetPostShareCountAsync(int postId);
     }
 }
