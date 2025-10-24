@@ -68,6 +68,7 @@ builder.Services.AddScoped<ICommentService, CommentService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<ITagService, TagService>();
 builder.Services.AddScoped<IShareService, ShareService>();
+builder.Services.AddScoped<IFriendshipService, FriendshipService>();
 
 // Authentication Services
 builder.Services.AddScoped<IFirebaseAuthService, FirebaseAuthService>();

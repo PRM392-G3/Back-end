@@ -22,6 +22,7 @@ namespace SocialNetworkMobile.Repository.Context
         public virtual DbSet<Comment> Comments { get; set; }
         public virtual DbSet<Like> Likes { get; set; }
         public virtual DbSet<Follow> Follows { get; set; }
+        public virtual DbSet<Friendship> Friendships { get; set; }
         public virtual DbSet<Tag> Tags { get; set; }
         public virtual DbSet<PostTag> PostTags { get; set; }
         public virtual DbSet<Notification> Notifications { get; set; }
@@ -176,6 +177,31 @@ namespace SocialNetworkMobile.Repository.Context
                 entity.HasOne(d => d.Following).WithMany(p => p.Followers)
                     .HasForeignKey(d => d.FollowingId)
                     .HasConstraintName("fk_follows_following_id");
+            });
+
+            // Friendships
+            modelBuilder.Entity<Friendship>(entity =>
+            {
+                entity.HasKey(e => e.Id).HasName("pk_friendships");
+                entity.ToTable("friendships", "public");
+                entity.HasIndex(e => e.RequesterId, "ix_friendships_requester_id");
+                entity.HasIndex(e => e.ReceiverId, "ix_friendships_receiver_id");
+                entity.HasIndex(e => e.Status, "ix_friendships_status");
+                entity.HasIndex(e => new { e.RequesterId, e.ReceiverId }, "uq_friendships_requester_receiver").IsUnique();
+                entity.Property(e => e.Id).HasColumnName("Id");
+                entity.Property(e => e.RequesterId).HasColumnName("RequesterId");
+                entity.Property(e => e.ReceiverId).HasColumnName("ReceiverId");
+                entity.Property(e => e.Status).HasColumnName("Status").IsRequired().HasMaxLength(20).HasDefaultValue("pending");
+                entity.Property(e => e.RequestedAt).HasColumnName("RequestedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.RespondedAt).HasColumnName("RespondedAt");
+                entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.UpdatedAt).HasColumnName("UpdatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.HasOne(d => d.Requester).WithMany(p => p.SentFriendRequests)
+                    .HasForeignKey(d => d.RequesterId)
+                    .HasConstraintName("fk_friendships_requester_id");
+                entity.HasOne(d => d.Receiver).WithMany(p => p.ReceivedFriendRequests)
+                    .HasForeignKey(d => d.ReceiverId)
+                    .HasConstraintName("fk_friendships_receiver_id");
             });
 
             // Tags
