@@ -71,6 +71,7 @@ builder.Services.AddScoped<ITagService, TagService>();
 builder.Services.AddScoped<IShareService, ShareService>();
 builder.Services.AddScoped<IFriendshipService, FriendshipService>();
 builder.Services.AddScoped<IReelService, ReelService>();
+builder.Services.AddScoped<IGroupService, GroupService>();
 
 // Authentication Services
 builder.Services.AddScoped<IFirebaseAuthService, FirebaseAuthService>();
