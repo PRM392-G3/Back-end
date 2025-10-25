@@ -169,7 +169,95 @@ namespace SocialNetworkMobile.Controllers
         #region Member Management
 
         /// <summary>
-        /// Mời thành viên vào nhóm
+        /// Gửi yêu cầu tham gia nhóm (User → Admin)
+        /// </summary>
+        [HttpPost("{groupId}/request-join")]
+        [Authorize]
+        public async Task<ActionResult<GroupMemberResponse>> RequestToJoinGroup(int groupId)
+        {
+            try
+            {
+                var userIdStr = User.FindFirst("userId")?.Value;
+                if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out int userId))
+                {
+                    return Unauthorized("User ID not found in token");
+                }
+
+                var member = await _groupService.RequestToJoinGroupAsync(groupId, userId);
+                return Ok(member);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Duyệt yêu cầu tham gia (Admin only)
+        /// </summary>
+        [HttpPost("{groupId}/approve-request/{userId}")]
+        [Authorize]
+        public async Task<ActionResult> ApproveJoinRequest(int groupId, int userId)
+        {
+            try
+            {
+                var approverIdStr = User.FindFirst("userId")?.Value;
+                if (string.IsNullOrEmpty(approverIdStr) || !int.TryParse(approverIdStr, out int approverId))
+                {
+                    return Unauthorized("User ID not found in token");
+                }
+
+                var result = await _groupService.ApproveJoinRequestAsync(groupId, userId, approverId);
+                if (result)
+                    return Ok(new { message = "Join request approved" });
+                return NotFound("Join request not found");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Từ chối yêu cầu tham gia (Admin only)
+        /// </summary>
+        [HttpPost("{groupId}/reject-request/{userId}")]
+        [Authorize]
+        public async Task<ActionResult> RejectJoinRequest(int groupId, int userId)
+        {
+            try
+            {
+                var rejectorIdStr = User.FindFirst("userId")?.Value;
+                if (string.IsNullOrEmpty(rejectorIdStr) || !int.TryParse(rejectorIdStr, out int rejectorId))
+                {
+                    return Unauthorized("User ID not found in token");
+                }
+
+                var result = await _groupService.RejectJoinRequestAsync(groupId, userId, rejectorId);
+                if (result)
+                    return Ok(new { message = "Join request rejected" });
+                return NotFound("Join request not found");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Mời thành viên vào nhóm (Admin/Moderator → User)
         /// </summary>
         [HttpPost("invite")]
         [Authorize]
@@ -313,7 +401,7 @@ namespace SocialNetworkMobile.Controllers
         }
 
         /// <summary>
-        /// Xem lời mời pending
+        /// Xem lời mời pending từ Member/Moderator chờ Admin duyệt
         /// </summary>
         [HttpGet("{groupId}/invitations/pending")]
         [Authorize]
@@ -323,6 +411,94 @@ namespace SocialNetworkMobile.Controllers
             {
                 var invitations = await _groupService.GetPendingInvitationsAsync(groupId);
                 return Ok(invitations);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Duyệt lời mời từ Member/Moderator (Admin only)
+        /// </summary>
+        [HttpPost("{groupId}/approve-invitation/{userId}")]
+        [Authorize]
+        public async Task<ActionResult> ApproveInvitation(int groupId, int userId)
+        {
+            try
+            {
+                var approverIdStr = User.FindFirst("userId")?.Value;
+                if (string.IsNullOrEmpty(approverIdStr) || !int.TryParse(approverIdStr, out int approverId))
+                {
+                    return Unauthorized("User ID not found in token");
+                }
+
+                var result = await _groupService.ApproveInvitationAsync(groupId, userId, approverId);
+                if (result)
+                    return Ok(new { message = "Invitation approved, user joined the group" });
+                return NotFound("Invitation not found");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Từ chối lời mời từ Member/Moderator (Admin only)
+        /// </summary>
+        [HttpPost("{groupId}/reject-invitation/{userId}")]
+        [Authorize]
+        public async Task<ActionResult> RejectInvitationRequest(int groupId, int userId)
+        {
+            try
+            {
+                var rejectorIdStr = User.FindFirst("userId")?.Value;
+                if (string.IsNullOrEmpty(rejectorIdStr) || !int.TryParse(rejectorIdStr, out int rejectorId))
+                {
+                    return Unauthorized("User ID not found in token");
+                }
+
+                var result = await _groupService.RejectInvitationRequestAsync(groupId, userId, rejectorId);
+                if (result)
+                    return Ok(new { message = "Invitation rejected" });
+                return NotFound("Invitation not found");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Xem danh sách yêu cầu tham gia chờ duyệt (Admin only) (User → Admin)
+        /// </summary>
+        [HttpGet("{groupId}/join-requests/pending")]
+        [Authorize]
+        public async Task<ActionResult<List<GroupMemberResponse>>> GetPendingJoinRequests(int groupId)
+        {
+            try
+            {
+                var userIdStr = User.FindFirst("userId")?.Value;
+                if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out int userId))
+                {
+                    return Unauthorized("User ID not found in token");
+                }
+
+                var joinRequests = await _groupService.GetPendingJoinRequestsAsync(groupId, userId);
+                return Ok(joinRequests);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, ex.Message);
             }
             catch (ArgumentException ex)
             {

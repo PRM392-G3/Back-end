@@ -29,7 +29,7 @@ namespace SocialNetworkMobile.Repository.Models
         public string Status { get; set; } = "active"; // pending, active, banned
 
         [Column("JoinedAt")]
-        public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? JoinedAt { get; set; }
 
         [Column("InvitedById")]
         public int? InvitedById { get; set; }

@@ -13,7 +13,7 @@ namespace SocialNetworkMobile.Services.Object.Requests
         [Required]
         public int InvitedById { get; set; }
 
-        [RegularExpression("^(member|moderator)$", ErrorMessage = "Role must be 'member' or 'moderator'")]
+        [RegularExpression("^(member|admin)$", ErrorMessage = "Role must be 'member' or 'admin'")]
         public string Role { get; set; } = "member";
     }
 }

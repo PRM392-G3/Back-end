@@ -18,7 +18,12 @@ namespace SocialNetworkMobile.Services.Interfaces
         Task<List<GroupResponse>> GetUserGroupsAsync(int userId);
         
         // Member Management
+        Task<GroupMemberResponse> RequestToJoinGroupAsync(int groupId, int userId);
+        Task<bool> ApproveJoinRequestAsync(int groupId, int userId, int approvedBy);
+        Task<bool> RejectJoinRequestAsync(int groupId, int userId, int rejectedBy);
         Task<GroupMemberResponse> InviteMemberAsync(InviteMemberRequest request);
+        Task<bool> ApproveInvitationAsync(int groupId, int userId, int approvedBy);
+        Task<bool> RejectInvitationRequestAsync(int groupId, int userId, int rejectedBy);
         Task<bool> AcceptInvitationAsync(int groupId, int userId);
         Task<bool> RejectInvitationAsync(int groupId, int userId);
         Task<bool> RemoveMemberAsync(int groupId, int userId, int removedBy);
@@ -28,6 +33,7 @@ namespace SocialNetworkMobile.Services.Interfaces
         Task<List<GroupMemberResponse>> GetGroupMembersAsync(int groupId);
         Task<List<GroupMemberResponse>> GetActiveGroupMembersAsync(int groupId);
         Task<List<GroupMemberResponse>> GetPendingInvitationsAsync(int groupId);
+        Task<List<GroupMemberResponse>> GetPendingJoinRequestsAsync(int groupId, int requestedBy);
         Task<bool> IsMemberAsync(int groupId, int userId);
         Task<string?> GetMemberRoleAsync(int groupId, int userId);
         

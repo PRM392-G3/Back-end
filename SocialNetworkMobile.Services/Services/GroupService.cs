@@ -184,6 +184,115 @@ namespace SocialNetworkMobile.Services.Services
 
         #region Member Management
 
+        public async Task<GroupMemberResponse> RequestToJoinGroupAsync(int groupId, int userId)
+        {
+            // Validate group and user exist
+            var group = await _context.Groups.FindAsync(groupId);
+            var user = await _context.Users.FindAsync(userId);
+
+            if (group == null || user == null)
+                throw new ArgumentException("Group or User not found");
+
+            // Check if group is public (only public groups allow join requests)
+            if (group.Privacy != GroupPrivacy.Public)
+                throw new InvalidOperationException("Join requests are only allowed for public groups");
+
+            // Check if user already member or has pending request
+            var existingMember = await _context.GroupMembers
+                .FirstOrDefaultAsync(gm => gm.GroupId == groupId && gm.UserId == userId);
+
+            if (existingMember != null)
+            {
+                if (existingMember.Status == GroupMemberStatus.Active)
+                    throw new ArgumentException("User is already a member");
+                if (existingMember.Status == GroupMemberStatus.Pending)
+                    throw new ArgumentException("User already has a pending request");
+                if (existingMember.Status == GroupMemberStatus.Banned)
+                    throw new ArgumentException("User is banned from this group");
+            }
+
+            // Create join request (InvitedById is null to distinguish from invitations)
+            var member = new GroupMember
+            {
+                GroupId = groupId,
+                UserId = userId,
+                Role = GroupMemberRole.Member,
+                Status = GroupMemberStatus.Pending,
+                InvitedById = null, // null means join request, not invitation
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _context.GroupMembers.Add(member);
+            await _context.SaveChangesAsync();
+
+            return await GetGroupMemberByIdAsync(member.Id);
+        }
+
+        public async Task<bool> ApproveJoinRequestAsync(int groupId, int userId, int approvedBy)
+        {
+            // Check if approver is admin
+            var approver = await _context.GroupMembers
+                .FirstOrDefaultAsync(gm => 
+                    gm.GroupId == groupId && 
+                    gm.UserId == approvedBy && 
+                    gm.Status == GroupMemberStatus.Active);
+
+            if (approver == null || approver.Role != GroupMemberRole.Admin)
+                throw new UnauthorizedAccessException("Only admins can approve join requests");
+
+            // Find pending join request (InvitedById is null for join requests)
+            var member = await _context.GroupMembers
+                .AsTracking()
+                .FirstOrDefaultAsync(gm => 
+                    gm.GroupId == groupId && 
+                    gm.UserId == userId && 
+                    gm.Status == GroupMemberStatus.Pending &&
+                    gm.InvitedById == null);
+
+            if (member == null)
+                return false;
+
+            member.Status = GroupMemberStatus.Active;
+            member.JoinedAt = DateTime.UtcNow;
+            member.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            await UpdateMemberCountAsync(groupId);
+
+            return true;
+        }
+
+        public async Task<bool> RejectJoinRequestAsync(int groupId, int userId, int rejectedBy)
+        {
+            // Check if rejector is admin
+            var rejector = await _context.GroupMembers
+                .FirstOrDefaultAsync(gm => 
+                    gm.GroupId == groupId && 
+                    gm.UserId == rejectedBy && 
+                    gm.Status == GroupMemberStatus.Active);
+
+            if (rejector == null || rejector.Role != GroupMemberRole.Admin)
+                throw new UnauthorizedAccessException("Only admins can reject join requests");
+
+            // Find pending join request (InvitedById is null for join requests)
+            var member = await _context.GroupMembers
+                .AsTracking()
+                .FirstOrDefaultAsync(gm => 
+                    gm.GroupId == groupId && 
+                    gm.UserId == userId && 
+                    gm.Status == GroupMemberStatus.Pending &&
+                    gm.InvitedById == null);
+
+            if (member == null)
+                return false;
+
+            _context.GroupMembers.Remove(member);
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+
         public async Task<GroupMemberResponse> InviteMemberAsync(InviteMemberRequest request)
         {
             // Validate group and users exist
@@ -194,37 +303,57 @@ namespace SocialNetworkMobile.Services.Services
             if (group == null || user == null || inviter == null)
                 throw new ArgumentException("Group, User, or Inviter not found");
 
-            // Check if inviter has permission (admin or moderator)
+            // Check if inviter is a member of the group
             var inviterMember = await _context.GroupMembers
                 .FirstOrDefaultAsync(gm => 
                     gm.GroupId == request.GroupId && 
                     gm.UserId == request.InvitedById &&
                     gm.Status == GroupMemberStatus.Active);
 
-            if (inviterMember == null || 
-                (inviterMember.Role != GroupMemberRole.Admin && inviterMember.Role != GroupMemberRole.Moderator))
-                throw new UnauthorizedAccessException("Only admins and moderators can invite members");
+            if (inviterMember == null)
+                throw new UnauthorizedAccessException("Only group members can invite others");
 
             // Check if user already member
             var existingMember = await _context.GroupMembers
                 .FirstOrDefaultAsync(gm => gm.GroupId == request.GroupId && gm.UserId == request.UserId);
 
             if (existingMember != null)
-                throw new ArgumentException("User is already a member or has pending invitation");
+            {
+                if (existingMember.Status == GroupMemberStatus.Active)
+                    throw new ArgumentException("User is already a member");
+                if (existingMember.Status == GroupMemberStatus.Pending)
+                    throw new ArgumentException("User already has a pending invitation");
+                if (existingMember.Status == GroupMemberStatus.Banned)
+                    throw new ArgumentException("User is banned from this group");
+            }
+
+            // Determine status based on inviter role
+            // Admin invitation: Direct Active (vào luôn)
+            // Moderator/Member invitation: Pending (chờ Admin duyệt)
+            bool isDirectApproval = inviterMember.Role == GroupMemberRole.Admin;
+            var memberStatus = isDirectApproval ? GroupMemberStatus.Active : GroupMemberStatus.Pending;
+            var joinedAt = isDirectApproval ? DateTime.UtcNow : (DateTime?)null;
 
             var member = new GroupMember
             {
                 GroupId = request.GroupId,
                 UserId = request.UserId,
                 Role = request.Role,
-                Status = GroupMemberStatus.Pending,
+                Status = memberStatus,
                 InvitedById = request.InvitedById,
+                JoinedAt = joinedAt,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
 
             _context.GroupMembers.Add(member);
             await _context.SaveChangesAsync();
+
+            // Update member count if directly approved
+            if (isDirectApproval)
+            {
+                await UpdateMemberCountAsync(request.GroupId);
+            }
 
             return await GetGroupMemberByIdAsync(member.Id);
         }
@@ -334,6 +463,7 @@ namespace SocialNetworkMobile.Services.Services
             var members = await _context.GroupMembers
                 .Where(gm => gm.GroupId == groupId)
                 .Include(gm => gm.User)
+                .Include(gm => gm.InvitedBy)
                 .Include(gm => gm.Group)
                 .OrderByDescending(gm => gm.Role)
                 .ThenBy(gm => gm.JoinedAt)
@@ -347,6 +477,7 @@ namespace SocialNetworkMobile.Services.Services
             var members = await _context.GroupMembers
                 .Where(gm => gm.GroupId == groupId && gm.Status == GroupMemberStatus.Active)
                 .Include(gm => gm.User)
+                .Include(gm => gm.InvitedBy)
                 .OrderByDescending(gm => gm.Role)
                 .ThenBy(gm => gm.JoinedAt)
                 .ToListAsync();
@@ -356,13 +487,107 @@ namespace SocialNetworkMobile.Services.Services
 
         public async Task<List<GroupMemberResponse>> GetPendingInvitationsAsync(int groupId)
         {
+            // Get pending invitations from Moderator/Member (waiting for Admin approval)
+            // InvitedById is not null and Status is Pending
             var members = await _context.GroupMembers
-                .Where(gm => gm.GroupId == groupId && gm.Status == GroupMemberStatus.Pending)
+                .Where(gm => gm.GroupId == groupId && 
+                            gm.Status == GroupMemberStatus.Pending &&
+                            gm.InvitedById != null)
                 .Include(gm => gm.User)
+                .Include(gm => gm.InvitedBy)
                 .OrderByDescending(gm => gm.CreatedAt)
                 .ToListAsync();
 
             return members.Select(MapMemberToResponse).ToList();
+        }
+
+        public async Task<bool> ApproveInvitationAsync(int groupId, int userId, int approvedBy)
+        {
+            // Check if approver is admin
+            var approver = await _context.GroupMembers
+                .FirstOrDefaultAsync(gm => 
+                    gm.GroupId == groupId && 
+                    gm.UserId == approvedBy && 
+                    gm.Status == GroupMemberStatus.Active);
+
+            if (approver == null || approver.Role != GroupMemberRole.Admin)
+                throw new UnauthorizedAccessException("Only admins can approve invitations");
+
+            // Find pending invitation from Moderator/Member (InvitedById is not null)
+            var member = await _context.GroupMembers
+                .AsTracking()
+                .FirstOrDefaultAsync(gm => 
+                    gm.GroupId == groupId && 
+                    gm.UserId == userId && 
+                    gm.Status == GroupMemberStatus.Pending &&
+                    gm.InvitedById != null);
+
+            if (member == null)
+                return false;
+
+            // Approve: User joins the group directly
+            member.Status = GroupMemberStatus.Active;
+            member.JoinedAt = DateTime.UtcNow;
+            member.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            await UpdateMemberCountAsync(groupId);
+
+            return true;
+        }
+
+        public async Task<bool> RejectInvitationRequestAsync(int groupId, int userId, int rejectedBy)
+        {
+            // Check if rejector is admin
+            var rejector = await _context.GroupMembers
+                .FirstOrDefaultAsync(gm => 
+                    gm.GroupId == groupId && 
+                    gm.UserId == rejectedBy && 
+                    gm.Status == GroupMemberStatus.Active);
+
+            if (rejector == null || rejector.Role != GroupMemberRole.Admin)
+                throw new UnauthorizedAccessException("Only admins can reject invitation requests");
+
+            // Find pending invitation from Moderator/Member (InvitedById is not null)
+            var member = await _context.GroupMembers
+                .AsTracking()
+                .FirstOrDefaultAsync(gm => 
+                    gm.GroupId == groupId && 
+                    gm.UserId == userId && 
+                    gm.Status == GroupMemberStatus.Pending &&
+                    gm.InvitedById != null);
+
+            if (member == null)
+                return false;
+
+            _context.GroupMembers.Remove(member);
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+
+        public async Task<List<GroupMemberResponse>> GetPendingJoinRequestsAsync(int groupId, int requestedBy)
+        {
+            // Check if requester is admin
+            var requester = await _context.GroupMembers
+                .FirstOrDefaultAsync(gm => 
+                    gm.GroupId == groupId && 
+                    gm.UserId == requestedBy && 
+                    gm.Status == GroupMemberStatus.Active);
+
+            if (requester == null || requester.Role != GroupMemberRole.Admin)
+                throw new UnauthorizedAccessException("Only admins can view join requests");
+
+            // Get pending join requests (InvitedById is null)
+            var joinRequests = await _context.GroupMembers
+                .Where(gm => gm.GroupId == groupId && 
+                            gm.Status == GroupMemberStatus.Pending &&
+                            gm.InvitedById == null)
+                .Include(gm => gm.User)
+                .OrderByDescending(gm => gm.CreatedAt)
+                .ToListAsync();
+
+            return joinRequests.Select(MapMemberToResponse).ToList();
         }
 
         public async Task<bool> IsMemberAsync(int groupId, int userId)
@@ -528,6 +753,7 @@ namespace SocialNetworkMobile.Services.Services
         {
             var member = await _context.GroupMembers
                 .Include(gm => gm.User)
+                .Include(gm => gm.InvitedBy)
                 .Include(gm => gm.Group)
                 .FirstOrDefaultAsync(gm => gm.Id == memberId);
 
@@ -568,6 +794,7 @@ namespace SocialNetworkMobile.Services.Services
                 JoinedAt = member.JoinedAt,
                 InvitedById = member.InvitedById,
                 User = member.User != null ? MapUserToResponse(member.User) : null,
+                InvitedBy = member.InvitedBy != null ? MapUserToResponse(member.InvitedBy) : null,
                 Group = member.Group != null ? MapToResponse(member.Group) : null
             };
         }
