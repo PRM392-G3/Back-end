@@ -20,6 +20,9 @@ namespace SocialNetworkMobile.Repository.Models
         [Column("CommentId")]
         public int? CommentId { get; set; }
 
+        [Column("ReelId")]
+        public int? ReelId { get; set; }
+
         [Required]
         [MaxLength(20)]
         [Column("LikeType")]
@@ -37,5 +40,8 @@ namespace SocialNetworkMobile.Repository.Models
 
         [ForeignKey("CommentId")]
         public virtual Comment? Comment { get; set; }
+
+        [ForeignKey("ReelId")]
+        public virtual Reel? Reel { get; set; }
     }
 }

@@ -4,8 +4,9 @@ namespace SocialNetworkMobile.Services.Object.Requests
 {
     public class CreateCommentRequest
     {
-        [Required]
-        public int PostId { get; set; }
+        public int? PostId { get; set; }
+
+        public int? ReelId { get; set; }
 
         [Required]
         public int UserId { get; set; }

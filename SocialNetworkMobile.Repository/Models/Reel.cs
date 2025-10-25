@@ -77,5 +77,7 @@ namespace SocialNetworkMobile.Repository.Models
 
         [ForeignKey("MusicId")]
         public virtual ReelMusic? Music { get; set; }
+
+        public virtual ICollection<Comment> Comments { get; set; } = new List<Comment>();
     }
 }

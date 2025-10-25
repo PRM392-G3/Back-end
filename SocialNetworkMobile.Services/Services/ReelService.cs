@@ -12,15 +12,21 @@ namespace SocialNetworkMobile.Services.Services
         private readonly GenericRepository<Reel> _reelRepository;
         private readonly GenericRepository<ReelMusic> _musicRepository;
         private readonly GenericRepository<User> _userRepository;
+        private readonly GenericRepository<Like> _likeRepository;
+        private readonly GenericRepository<Comment> _commentRepository;
 
         public ReelService(
             GenericRepository<Reel> reelRepository,
             GenericRepository<ReelMusic> musicRepository,
-            GenericRepository<User> userRepository)
+            GenericRepository<User> userRepository,
+            GenericRepository<Like> likeRepository,
+            GenericRepository<Comment> commentRepository)
         {
             _reelRepository = reelRepository;
             _musicRepository = musicRepository;
             _userRepository = userRepository;
+            _likeRepository = likeRepository;
+            _commentRepository = commentRepository;
         }
 
         public async Task<ReelResponse> CreateReelAsync(CreateReelRequest request)
@@ -121,12 +127,22 @@ namespace SocialNetworkMobile.Services.Services
             return response;
         }
 
-        public async Task<List<ReelResponse>> GetAllReelsAsync()
+        public async Task<List<ReelResponse>> GetAllReelsAsync(int? currentUserId = null)
         {
             try
             {
                 var reels = await _reelRepository.GetAllAsync();
                 var publicReels = reels.Where(r => r.IsPublic && r.IsDeleted == false).OrderByDescending(r => r.CreatedAt).ToList();
+                
+                // Get all likes for current user if authenticated
+                var userLikes = new HashSet<int>();
+                if (currentUserId.HasValue)
+                {
+                    var allLikes = await _likeRepository.GetAllAsync();
+                    userLikes = new HashSet<int>(allLikes
+                        .Where(l => l.UserId == currentUserId.Value && l.ReelId.HasValue)
+                        .Select(l => l.ReelId!.Value));
+                }
                 
                 var responses = new List<ReelResponse>();
                 foreach (var reel in publicReels)
@@ -153,7 +169,8 @@ namespace SocialNetworkMobile.Services.Services
                         IsPublic = reel.IsPublic,
                         IsDeleted = reel.IsDeleted,
                         CreatedAt = reel.CreatedAt,
-                        UpdatedAt = reel.UpdatedAt
+                        UpdatedAt = reel.UpdatedAt,
+                        IsLiked = userLikes.Contains(reel.Id) // Check if current user liked this reel
                     };
                     
                     // Get user info
@@ -323,6 +340,85 @@ namespace SocialNetworkMobile.Services.Services
                 throw new ArgumentException("Music not found");
 
             return music.Adapt<ReelMusicResponse>();
+        }
+
+        public async Task<bool> LikeReelAsync(int userId, int reelId)
+        {
+            // Check if user exists
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+                throw new ArgumentException("User not found");
+
+            // Check if reel exists
+            var reel = await _reelRepository.GetByIdAsync(reelId);
+            if (reel == null)
+                throw new ArgumentException("Reel not found");
+
+            // Check if user already liked this reel
+            var existingLikes = await _likeRepository.GetAllAsync();
+            var existingLike = existingLikes.FirstOrDefault(l => l.UserId == userId && l.ReelId == reelId);
+            
+            if (existingLike != null)
+                return true; // Already liked
+
+            // Create new like
+            var like = new Like
+            {
+                UserId = userId,
+                ReelId = reelId,
+                LikeType = "LIKE",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _likeRepository.CreateAsync(like);
+
+            // Update reel like count
+            reel.LikeCount++;
+            reel.UpdatedAt = DateTime.UtcNow;
+            await _reelRepository.UpdateAsync(reel);
+
+            return true;
+        }
+
+        public async Task<bool> UnlikeReelAsync(int userId, int reelId)
+        {
+            // Get existing like
+            var existingLikes = await _likeRepository.GetAllAsync();
+            var existingLike = existingLikes.FirstOrDefault(l => l.UserId == userId && l.ReelId == reelId);
+            
+            if (existingLike == null)
+                return true; // Not liked, nothing to do
+
+            // Delete the like
+            await _likeRepository.DeleteAsync(existingLike);
+
+            // Update reel like count
+            var reel = await _reelRepository.GetByIdAsync(reelId);
+            if (reel != null)
+            {
+                reel.LikeCount = Math.Max(0, reel.LikeCount - 1);
+                reel.UpdatedAt = DateTime.UtcNow;
+                await _reelRepository.UpdateAsync(reel);
+            }
+
+            return true;
+        }
+
+        public async Task<bool> UpdateCommentCountAsync(int reelId)
+        {
+            var reel = await _reelRepository.GetByIdAsync(reelId);
+            if (reel == null)
+                return false;
+
+            // Count comments for this reel
+            var comments = await _commentRepository.GetAllAsync();
+            var commentCount = comments.Count(c => c.ReelId == reelId && !c.IsDeleted);
+
+            reel.CommentCount = commentCount;
+            reel.UpdatedAt = DateTime.UtcNow;
+            await _reelRepository.UpdateAsync(reel);
+
+            return true;
         }
     }
 }

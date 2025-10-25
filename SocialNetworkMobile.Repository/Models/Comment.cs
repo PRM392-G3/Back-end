@@ -10,9 +10,11 @@ namespace SocialNetworkMobile.Repository.Models
         [Column("Id")]
         public int Id { get; set; }
 
-        [Required]
         [Column("PostId")]
-        public int PostId { get; set; }
+        public int? PostId { get; set; }
+
+        [Column("ReelId")]
+        public int? ReelId { get; set; }
 
         [Required]
         [Column("UserId")]
@@ -40,7 +42,10 @@ namespace SocialNetworkMobile.Repository.Models
 
         // Navigation properties
         [ForeignKey("PostId")]
-        public virtual Post Post { get; set; } = null!;
+        public virtual Post? Post { get; set; }
+
+        [ForeignKey("ReelId")]
+        public virtual Reel? Reel { get; set; }
 
         [ForeignKey("UserId")]
         public virtual User User { get; set; } = null!;

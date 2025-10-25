@@ -131,7 +131,7 @@ namespace SocialNetworkMobile.Services.Services
                 commentResponses.Add(new CommentResponse
                 {
                     Id = comment.Id,
-                    PostId = comment.PostId,
+                    PostId = comment.PostId ?? 0,
                     UserId = comment.UserId,
                     Content = comment.Content,
                     ParentCommentId = comment.ParentCommentId ?? 0,
@@ -215,7 +215,7 @@ namespace SocialNetworkMobile.Services.Services
                     commentResponses.Add(new CommentResponse
                     {
                         Id = comment.Id,
-                        PostId = comment.PostId,
+                        PostId = comment.PostId ?? 0,
                         UserId = comment.UserId,
                         Content = comment.Content,
                         ParentCommentId = comment.ParentCommentId ?? 0,
@@ -348,7 +348,7 @@ namespace SocialNetworkMobile.Services.Services
                     commentResponses.Add(new CommentResponse
                     {
                         Id = comment.Id,
-                        PostId = comment.PostId,
+                        PostId = comment.PostId ?? 0,
                         UserId = comment.UserId,
                         Content = comment.Content,
                         ParentCommentId = comment.ParentCommentId ?? 0,
@@ -496,7 +496,7 @@ namespace SocialNetworkMobile.Services.Services
                     commentResponses.Add(new CommentResponse
                     {
                         Id = comment.Id,
-                        PostId = comment.PostId,
+                        PostId = comment.PostId ?? 0,
                         UserId = comment.UserId,
                         Content = comment.Content,
                         ParentCommentId = comment.ParentCommentId ?? 0,
@@ -832,7 +832,7 @@ namespace SocialNetworkMobile.Services.Services
                     commentResponses.Add(new CommentResponse
                     {
                         Id = comment.Id,
-                        PostId = comment.PostId,
+                        PostId = comment.PostId ?? 0,
                         UserId = comment.UserId,
                         Content = comment.Content,
                         ParentCommentId = comment.ParentCommentId ?? 0,

@@ -67,7 +67,22 @@ namespace SocialNetworkMobile.Controllers
         {
             try
             {
-                var reels = await _reelService.GetAllReelsAsync();
+                // Get current user ID if authenticated
+                int? currentUserId = null;
+                try
+                {
+                    var userIdClaim = User.FindFirst("userId")?.Value;
+                    if (userIdClaim != null)
+                    {
+                        currentUserId = int.Parse(userIdClaim);
+                    }
+                }
+                catch
+                {
+                    // User not authenticated or no userId claim
+                }
+
+                var reels = await _reelService.GetAllReelsAsync(currentUserId);
                 return Ok(reels);
             }
             catch (Exception ex)
@@ -172,6 +187,58 @@ namespace SocialNetworkMobile.Controllers
             catch (ArgumentException ex)
             {
                 return NotFound(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Like a reel
+        /// </summary>
+        [HttpPost("{reelId}/like/{userId}")]
+        [Authorize]
+        public async Task<ActionResult> LikeReel(int reelId, int userId)
+        {
+            try
+            {
+                var currentUserId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+                if (currentUserId == 0)
+                    return Unauthorized(new { error = "Invalid user token" });
+
+                // Verify the userId in the URL matches the current user
+                if (currentUserId != userId)
+                    return Forbid("You can only like on behalf of yourself");
+
+                var result = await _reelService.LikeReelAsync(userId, reelId);
+                return Ok(new { message = "Reel liked successfully" });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Unlike a reel
+        /// </summary>
+        [HttpDelete("{reelId}/like/{userId}")]
+        [Authorize]
+        public async Task<ActionResult> UnlikeReel(int reelId, int userId)
+        {
+            try
+            {
+                var currentUserId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+                if (currentUserId == 0)
+                    return Unauthorized(new { error = "Invalid user token" });
+
+                // Verify the userId in the URL matches the current user
+                if (currentUserId != userId)
+                    return Forbid("You can only unlike on behalf of yourself");
+
+                var result = await _reelService.UnlikeReelAsync(userId, reelId);
+                return Ok(new { message = "Reel unliked successfully" });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
             }
         }
     }

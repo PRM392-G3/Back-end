@@ -113,10 +113,12 @@ namespace SocialNetworkMobile.Repository.Context
                 entity.HasKey(e => e.Id).HasName("pk_comments");
                 entity.ToTable("comments", "public");
                 entity.HasIndex(e => e.PostId, "ix_comments_post_id");
+                entity.HasIndex(e => e.ReelId, "ix_comments_reel_id");
                 entity.HasIndex(e => e.UserId, "ix_comments_user_id");
                 entity.HasIndex(e => e.ParentCommentId, "ix_comments_parent_comment_id");
                 entity.Property(e => e.Id).HasColumnName("Id");
                 entity.Property(e => e.PostId).HasColumnName("PostId");
+                entity.Property(e => e.ReelId).HasColumnName("ReelId");
                 entity.Property(e => e.UserId).HasColumnName("UserId");
                 entity.Property(e => e.Content).HasColumnName("Content").IsRequired().HasMaxLength(1000);
                 entity.Property(e => e.ParentCommentId).HasColumnName("ParentCommentId");
@@ -127,6 +129,9 @@ namespace SocialNetworkMobile.Repository.Context
                 entity.HasOne(d => d.Post).WithMany(p => p.Comments)
                     .HasForeignKey(d => d.PostId)
                     .HasConstraintName("fk_comments_post_id");
+                entity.HasOne(d => d.Reel).WithMany(r => r.Comments)
+                    .HasForeignKey(d => d.ReelId)
+                    .HasConstraintName("fk_comments_reel_id");
                 entity.HasOne(d => d.User).WithMany(p => p.Comments)
                     .HasForeignKey(d => d.UserId)
                     .HasConstraintName("fk_comments_user_id");
@@ -149,6 +154,7 @@ namespace SocialNetworkMobile.Repository.Context
                 entity.Property(e => e.UserId).HasColumnName("UserId");
                 entity.Property(e => e.PostId).HasColumnName("PostId");
                 entity.Property(e => e.CommentId).HasColumnName("CommentId");
+                entity.Property(e => e.ReelId).HasColumnName("ReelId");
                 entity.Property(e => e.LikeType).HasColumnName("LikeType").IsRequired().HasMaxLength(20).HasDefaultValue("LIKE");
                 entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
                 entity.HasOne(d => d.User).WithMany(p => p.Likes)
@@ -160,6 +166,10 @@ namespace SocialNetworkMobile.Repository.Context
                 entity.HasOne(d => d.Comment).WithMany(p => p.Likes)
                     .HasForeignKey(d => d.CommentId)
                     .HasConstraintName("fk_likes_comment_id");
+                entity.HasOne(d => d.Reel).WithMany()
+                    .HasForeignKey(d => d.ReelId)
+                    .OnDelete(DeleteBehavior.SetNull)
+                    .HasConstraintName("fk_likes_reel_id");
             });
 
             // Follows

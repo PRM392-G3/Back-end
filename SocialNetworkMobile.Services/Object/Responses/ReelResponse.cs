@@ -24,5 +24,6 @@ namespace SocialNetworkMobile.Services.Object.Responses
         public DateTime UpdatedAt { get; set; }
         public UserResponse? User { get; set; }
         public ReelMusicResponse? Music { get; set; }
+        public bool IsLiked { get; set; }
     }
 }
