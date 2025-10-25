@@ -371,6 +371,8 @@ namespace SocialNetworkMobile.Repository.Context
                 entity.Property(e => e.Duration).HasColumnName("Duration");
                 entity.Property(e => e.CoverImageUrl).HasColumnName("CoverImageUrl");
                 entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
+            });
+
             // Groups
             modelBuilder.Entity<Group>(entity =>
             {
