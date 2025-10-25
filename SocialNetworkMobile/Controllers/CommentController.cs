@@ -60,6 +60,20 @@ namespace SocialNetworkMobile.Controllers
             }
         }
 
+        [HttpGet("reel/{reelId}")]
+        public async Task<ActionResult<List<CommentResponse>>> GetCommentsByReel(int reelId)
+        {
+            try
+            {
+                var comments = await _commentService.GetCommentsByReelIdAsync(reelId);
+                return Ok(comments);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpGet("{commentId}/replies")]
         public async Task<ActionResult<List<CommentResponse>>> GetReplies(int commentId)
         {

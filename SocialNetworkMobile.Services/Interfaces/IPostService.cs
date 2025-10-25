@@ -8,8 +8,11 @@ namespace SocialNetworkMobile.Services.Interfaces
         Task<PostResponse> CreatePostAsync(CreatePostRequest request);
         Task<PostResponse> GetPostByIdAsync(int id);
         Task<List<PostResponse>> GetAllPostsAsync();
+        Task<List<PostResponse>> GetAllPostsWithLikesAsync(int currentUserId);
         Task<List<PostResponse>> GetPostsByUserIdAsync(int userId);
+        Task<List<PostResponse>> GetPostsByUserIdWithLikesAsync(int userId, int currentUserId);
         Task<List<PostResponse>> GetSharedPostsByUserIdAsync(int userId);
+        Task<List<PostResponse>> GetSharedPostsByUserIdWithLikesAsync(int userId, int currentUserId);
         Task<List<PostResponse>> GetFeedPostsAsync(int userId, int page = 1, int pageSize = 10);
         Task<PostResponse> UpdatePostAsync(int id, UpdatePostRequest request);
         Task<bool> DeletePostAsync(int id);

@@ -13,6 +13,7 @@ using SocialNetworkMobile.Services.Services;
 using SocialNetworkMobile.Services.Services.Authentication;
 using Supabase;
 using System.Text;
+using Mapster;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -69,6 +70,7 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<ITagService, TagService>();
 builder.Services.AddScoped<IShareService, ShareService>();
 builder.Services.AddScoped<IFriendshipService, FriendshipService>();
+builder.Services.AddScoped<IReelService, ReelService>();
 builder.Services.AddScoped<IGroupService, GroupService>();
 
 // Authentication Services

@@ -8,7 +8,7 @@ namespace SocialNetworkMobile.Services.Object.Responses
         public string? Caption { get; set; }
         public bool IsPublic { get; set; }
         public DateTime CreatedAt { get; set; }
-        public UserResponse User { get; set; } = null!;
+        public UserResponse? User { get; set; }
         public PostResponse? Post { get; set; }
     }
 }

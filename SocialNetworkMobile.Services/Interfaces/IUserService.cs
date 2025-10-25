@@ -7,7 +7,7 @@ namespace SocialNetworkMobile.Services.Interfaces
     {
         Task<UserResponse> CreateUserAsync(CreateUserRequest request);
         Task<UserResponse> GetUserByIdAsync(int id);
-        Task<UserResponse> GetUserByNameAsync(string name);
+        Task<List<UserResponse>> GetUserByNameAsync(string name);
         Task<UserResponse> GetUserByEmailAsync(string email);
         Task<List<UserResponse>> GetAllUsersAsync();
         Task<UserResponse> UpdateUserAsync(int id, UpdateUserRequest request);
@@ -19,5 +19,7 @@ namespace SocialNetworkMobile.Services.Interfaces
         Task<List<UserResponse>> GetFollowersAsync(int userId);
         Task<List<UserResponse>> GetFollowingAsync(int userId);
         Task<bool> IsFollowingAsync(int followerId, int followingId);
+        Task<List<UserResponse>> GetFollowersWithStatusAsync(int userId, int currentUserId);
+        Task<List<UserResponse>> GetFollowingWithStatusAsync(int userId, int currentUserId);
     }
 }

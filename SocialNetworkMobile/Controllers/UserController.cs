@@ -51,14 +51,19 @@ namespace SocialNetworkMobile.Controllers
         /// Search users by name (case-insensitive)
         /// </summary>
         [HttpGet("search")]
-        public async Task<ActionResult<List<UserResponse>>> SearchUsersByName([FromQuery] string name)
+        public async Task<ActionResult<List<UserResponse>>> SearchUsersByName([FromQuery] string name, [FromQuery] int page = 1, [FromQuery] int limit = 20)
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    return BadRequest(new { error = "Search query is required" });
+                }
+
                 var users = await _userService.GetUserByNameAsync(name);
 
-                if (users == null)
-                    return NotFound(new { message = "User not found" });
+                if (users == null || !users.Any())
+                    return Ok(new List<UserResponse>()); // Return empty list instead of NotFound
 
                 return Ok(users);
             }
@@ -160,12 +165,50 @@ namespace SocialNetworkMobile.Controllers
             }
         }
 
+        [HttpGet("{userId}/followers/with-status")]
+        [Authorize]
+        public async Task<ActionResult<List<UserResponse>>> GetFollowersWithStatus(int userId)
+        {
+            try
+            {
+                var currentUserId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+                if (currentUserId == 0)
+                    return Unauthorized(new { error = "Invalid user token" });
+
+                var followers = await _userService.GetFollowersWithStatusAsync(userId, currentUserId);
+                return Ok(followers);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpGet("{userId}/following")]
         public async Task<ActionResult<List<UserResponse>>> GetFollowing(int userId)
         {
             try
             {
                 var following = await _userService.GetFollowingAsync(userId);
+                return Ok(following);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet("{userId}/following/with-status")]
+        [Authorize]
+        public async Task<ActionResult<List<UserResponse>>> GetFollowingWithStatus(int userId)
+        {
+            try
+            {
+                var currentUserId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+                if (currentUserId == 0)
+                    return Unauthorized(new { error = "Invalid user token" });
+
+                var following = await _userService.GetFollowingWithStatusAsync(userId, currentUserId);
                 return Ok(following);
             }
             catch (ArgumentException ex)

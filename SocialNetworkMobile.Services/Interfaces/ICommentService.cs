@@ -8,6 +8,7 @@ namespace SocialNetworkMobile.Services.Interfaces
         Task<CommentResponse> CreateCommentAsync(CreateCommentRequest request);
         Task<CommentResponse> GetCommentByIdAsync(int id);
         Task<List<CommentResponse>> GetCommentsByPostIdAsync(int postId);
+        Task<List<CommentResponse>> GetCommentsByReelIdAsync(int reelId);
         Task<List<CommentResponse>> GetRepliesByCommentIdAsync(int commentId);
         Task<CommentResponse> UpdateCommentAsync(int id, UpdateCommentRequest request);
         Task<bool> DeleteCommentAsync(int id);
