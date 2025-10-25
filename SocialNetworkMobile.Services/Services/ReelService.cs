@@ -132,7 +132,12 @@ namespace SocialNetworkMobile.Services.Services
             try
             {
                 var reels = await _reelRepository.GetAllAsync();
-                var publicReels = reels.Where(r => r.IsPublic && r.IsDeleted == false).OrderByDescending(r => r.CreatedAt).ToList();
+                
+                // Filter reels based on privacy settings
+                var filteredReels = reels.Where(r => r.IsDeleted == false && (
+                    r.IsPublic == true || // Show all public reels
+                    (r.IsPublic == false && currentUserId.HasValue && r.UserId == currentUserId.Value) // Show private reels only for their owner
+                )).OrderByDescending(r => r.CreatedAt).ToList();
                 
                 // Get all likes for current user if authenticated
                 var userLikes = new HashSet<int>();
@@ -145,7 +150,7 @@ namespace SocialNetworkMobile.Services.Services
                 }
                 
                 var responses = new List<ReelResponse>();
-                foreach (var reel in publicReels)
+                foreach (var reel in filteredReels)
                 {
                     // Manual mapping to ensure null safety
                     var response = new ReelResponse
@@ -296,6 +301,56 @@ namespace SocialNetworkMobile.Services.Services
             return responses;
         }
 
+        public async Task<ReelResponse> UpdateReelAsync(int id, int userId, UpdateReelRequest request)
+        {
+            var reel = await _reelRepository.GetByIdAsync(id);
+            if (reel == null)
+                throw new ArgumentException("Reel not found");
+
+            // Check if user owns the reel
+            if (reel.UserId != userId)
+                throw new UnauthorizedAccessException("You don't have permission to update this reel");
+
+            // Update only provided fields
+            if (request.Caption != null)
+                reel.Caption = request.Caption;
+            
+            if (request.IsPublic.HasValue)
+                reel.IsPublic = request.IsPublic.Value;
+            
+            if (request.VideoUrl != null)
+                reel.VideoUrl = request.VideoUrl;
+            
+            if (request.VideoFileName != null)
+                reel.VideoFileName = request.VideoFileName;
+            
+            if (request.MusicId.HasValue)
+                reel.MusicId = request.MusicId;
+            
+            if (request.MusicUrl != null)
+                reel.MusicUrl = request.MusicUrl;
+            
+            if (request.MusicFileName != null)
+                reel.MusicFileName = request.MusicFileName;
+            
+            if (request.MusicTitle != null)
+                reel.MusicTitle = request.MusicTitle;
+            
+            if (request.MusicArtist != null)
+                reel.MusicArtist = request.MusicArtist;
+            
+            if (request.MusicDuration.HasValue)
+                reel.MusicDuration = request.MusicDuration.Value;
+            
+            if (request.Duration.HasValue)
+                reel.Duration = request.Duration.Value;
+
+            reel.UpdatedAt = DateTime.UtcNow;
+            await _reelRepository.UpdateAsync(reel);
+            
+            return await GetReelByIdAsync(reel.Id);
+        }
+
         public async Task<bool> DeleteReelAsync(int id, int userId)
         {
             var reel = await _reelRepository.GetByIdAsync(id);
@@ -306,6 +361,25 @@ namespace SocialNetworkMobile.Services.Services
             if (reel.UserId != userId)
                 throw new UnauthorizedAccessException("You don't have permission to delete this reel");
 
+            // Delete all comments related to this reel first
+            var comments = await _commentRepository.GetAllAsync();
+            var reelComments = comments.Where(c => c.ReelId == id).ToList();
+            
+            foreach (var comment in reelComments)
+            {
+                await _commentRepository.DeleteAsync(comment);
+            }
+
+            // Delete all likes related to this reel
+            var likes = await _likeRepository.GetAllAsync();
+            var reelLikes = likes.Where(l => l.ReelId == id).ToList();
+            
+            foreach (var like in reelLikes)
+            {
+                await _likeRepository.DeleteAsync(like);
+            }
+
+            // Now delete the reel
             await _reelRepository.DeleteAsync(reel);
             return true;
         }

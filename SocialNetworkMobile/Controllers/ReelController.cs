@@ -109,6 +109,32 @@ namespace SocialNetworkMobile.Controllers
         }
 
         /// <summary>
+        /// Update a reel
+        /// </summary>
+        [HttpPut("{id}")]
+        [Authorize]
+        public async Task<ActionResult<ReelResponse>> UpdateReel(int id, [FromBody] UpdateReelRequest request)
+        {
+            try
+            {
+                var currentUserId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+                if (currentUserId == 0)
+                    return Unauthorized(new { error = "Invalid user token" });
+
+                var reel = await _reelService.UpdateReelAsync(id, currentUserId, request);
+                return Ok(reel);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Forbid(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Delete a reel
         /// </summary>
         [HttpDelete("{id}")]

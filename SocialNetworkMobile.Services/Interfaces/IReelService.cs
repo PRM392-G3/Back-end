@@ -9,6 +9,7 @@ namespace SocialNetworkMobile.Services.Interfaces
         Task<ReelResponse> GetReelByIdAsync(int id);
         Task<List<ReelResponse>> GetAllReelsAsync(int? currentUserId = null);
         Task<List<ReelResponse>> GetReelsByUserIdAsync(int userId);
+        Task<ReelResponse> UpdateReelAsync(int id, int userId, UpdateReelRequest request);
         Task<bool> DeleteReelAsync(int id, int userId);
         
         // Like/Unlike
