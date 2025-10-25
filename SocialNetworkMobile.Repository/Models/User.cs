@@ -74,5 +74,7 @@ namespace SocialNetworkMobile.Repository.Models
     public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
     public virtual ICollection<Notification> SentNotifications { get; set; } = new List<Notification>();
     public virtual ICollection<Share> Shares { get; set; } = new List<Share>();
+    public virtual ICollection<Group> CreatedGroups { get; set; } = new List<Group>();
+    public virtual ICollection<GroupMember> GroupMemberships { get; set; } = new List<GroupMember>();
 }
 }
