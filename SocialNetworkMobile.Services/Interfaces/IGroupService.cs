@@ -19,6 +19,8 @@ namespace SocialNetworkMobile.Services.Interfaces
         
         // Member Management
         Task<GroupMemberResponse> RequestToJoinGroupAsync(int groupId, int userId);
+        Task<string> GetUserJoinStatusAsync(int groupId, int userId);
+
         Task<bool> ApproveJoinRequestAsync(int groupId, int userId, int approvedBy);
         Task<bool> RejectJoinRequestAsync(int groupId, int userId, int rejectedBy);
         Task<GroupMemberResponse> InviteMemberAsync(InviteMemberRequest request);

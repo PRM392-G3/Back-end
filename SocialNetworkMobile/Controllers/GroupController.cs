@@ -196,6 +196,13 @@ namespace SocialNetworkMobile.Controllers
             }
         }
 
+        [HttpGet("{groupId}/join-status")]
+        public async Task<IActionResult> GetJoinStatus(int groupId, [FromQuery] int userId)
+        {
+            var status = await _groupService.GetUserJoinStatusAsync(groupId, userId);
+            return Ok(new { groupId, userId, status });
+        }
+
         /// <summary>
         /// Duyệt yêu cầu tham gia (Admin only)
         /// </summary>

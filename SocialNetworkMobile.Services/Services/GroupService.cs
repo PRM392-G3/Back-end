@@ -229,6 +229,18 @@ namespace SocialNetworkMobile.Services.Services
             return await GetGroupMemberByIdAsync(member.Id);
         }
 
+        public async Task<string> GetUserJoinStatusAsync(int groupId, int userId)
+        {
+            var member = await _context.GroupMembers
+                .FirstOrDefaultAsync(gm => gm.GroupId == groupId && gm.UserId == userId);
+
+            if (member == null)
+                return "none"; // chưa gửi yêu cầu hoặc chưa tham gia
+
+            return member.Status.ToLower(); // "active", "pending", "banned"
+        }
+
+
         public async Task<bool> ApproveJoinRequestAsync(int groupId, int userId, int approvedBy)
         {
             // Check if approver is admin
