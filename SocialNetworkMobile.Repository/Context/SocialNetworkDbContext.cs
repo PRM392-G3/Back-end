@@ -28,6 +28,8 @@ namespace SocialNetworkMobile.Repository.Context
         public virtual DbSet<Notification> Notifications { get; set; }
         public virtual DbSet<UserSocialProvider> UserSocialProviders { get; set; }
         public virtual DbSet<Share> Shares { get; set; }
+        public virtual DbSet<Reel> Reels { get; set; }
+        public virtual DbSet<ReelMusic> ReelMusics { get; set; }
 
         public static string GetConnectionString(string connectionStringName)
         {
@@ -306,6 +308,57 @@ namespace SocialNetworkMobile.Repository.Context
                 entity.HasOne(d => d.Post).WithMany(p => p.Shares)
                     .HasForeignKey(d => d.PostId)
                     .HasConstraintName("fk_shares_post_id");
+            });
+
+            // Reels
+            modelBuilder.Entity<Reel>(entity =>
+            {
+                entity.HasKey(e => e.Id).HasName("pk_reels");
+                entity.ToTable("reels", "public");
+                entity.HasIndex(e => e.UserId, "ix_reels_user_id");
+                entity.HasIndex(e => e.MusicId, "ix_reels_music_id");
+                entity.HasIndex(e => e.CreatedAt, "ix_reels_created_at");
+                entity.Property(e => e.Id).HasColumnName("Id");
+                entity.Property(e => e.UserId).HasColumnName("UserId");
+                entity.Property(e => e.VideoUrl).HasColumnName("VideoUrl").IsRequired();
+                entity.Property(e => e.VideoFileName).HasColumnName("VideoFileName");
+                entity.Property(e => e.Caption).HasColumnName("Caption").HasMaxLength(300);
+                entity.Property(e => e.MusicId).HasColumnName("MusicId");
+                entity.Property(e => e.MusicUrl).HasColumnName("MusicUrl");
+                entity.Property(e => e.MusicFileName).HasColumnName("MusicFileName");
+                entity.Property(e => e.MusicTitle).HasColumnName("MusicTitle");
+                entity.Property(e => e.MusicArtist).HasColumnName("MusicArtist");
+                entity.Property(e => e.MusicDuration).HasColumnName("MusicDuration").HasDefaultValue(0);
+                entity.Property(e => e.Duration).HasColumnName("Duration").HasDefaultValue(0);
+                entity.Property(e => e.LikeCount).HasColumnName("LikeCount").HasDefaultValue(0);
+                entity.Property(e => e.CommentCount).HasColumnName("CommentCount").HasDefaultValue(0);
+                entity.Property(e => e.ShareCount).HasColumnName("ShareCount").HasDefaultValue(0);
+                entity.Property(e => e.ViewCount).HasColumnName("ViewCount").HasDefaultValue(0);
+                entity.Property(e => e.IsPublic).HasColumnName("IsPublic").HasDefaultValue(true);
+                entity.Property(e => e.IsDeleted).HasColumnName("IsDeleted").HasDefaultValue(false);
+                entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.UpdatedAt).HasColumnName("UpdatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.HasOne(d => d.User).WithMany()
+                    .HasForeignKey(d => d.UserId)
+                    .HasConstraintName("fk_reels_user");
+                entity.HasOne(d => d.Music).WithMany()
+                    .HasForeignKey(d => d.MusicId)
+                    .OnDelete(DeleteBehavior.SetNull)
+                    .HasConstraintName("fk_reels_music");
+            });
+
+            // Reel Music
+            modelBuilder.Entity<ReelMusic>(entity =>
+            {
+                entity.HasKey(e => e.Id).HasName("pk_reel_music");
+                entity.ToTable("reel_music", "public");
+                entity.Property(e => e.Id).HasColumnName("Id");
+                entity.Property(e => e.Title).HasColumnName("Title").IsRequired().HasMaxLength(150);
+                entity.Property(e => e.Artist).HasColumnName("Artist").HasMaxLength(100);
+                entity.Property(e => e.MusicUrl).HasColumnName("MusicUrl").IsRequired();
+                entity.Property(e => e.Duration).HasColumnName("Duration");
+                entity.Property(e => e.CoverImageUrl).HasColumnName("CoverImageUrl");
+                entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("CURRENT_TIMESTAMP");
             });
 
             OnModelCreatingPartial(modelBuilder);
