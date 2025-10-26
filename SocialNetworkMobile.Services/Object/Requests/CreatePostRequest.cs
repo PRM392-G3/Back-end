@@ -18,5 +18,7 @@ namespace SocialNetworkMobile.Services.Object.Requests
         public string? VideoUrl { get; set; }
 
         public List<string>? Tags { get; set; }
+
+        public int? GroupId { get; set; }
     }
 }

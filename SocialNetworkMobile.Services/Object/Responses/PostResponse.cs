@@ -11,9 +11,11 @@ namespace SocialNetworkMobile.Services.Object.Responses
         public int CommentCount { get; set; }
         public int ShareCount { get; set; }
         public bool IsPublic { get; set; }
+        public int? GroupId { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public UserResponse User { get; set; } = null!;
+        public GroupResponse? Group { get; set; }
         public List<TagResponse> Tags { get; set; } = new List<TagResponse>();
         public List<LikeResponse> Likes { get; set; } = new List<LikeResponse>();
         public List<CommentResponse> Comments { get; set; } = new List<CommentResponse>();

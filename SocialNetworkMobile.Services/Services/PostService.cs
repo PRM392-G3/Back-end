@@ -1,4 +1,5 @@
 using SocialNetworkMobile.Repository.Basic;
+using SocialNetworkMobile.Repository.Context;
 using SocialNetworkMobile.Repository.Models;
 using SocialNetworkMobile.Services.Interfaces;
 using SocialNetworkMobile.Services.Object.Requests;
@@ -17,6 +18,8 @@ namespace SocialNetworkMobile.Services.Services
         private readonly GenericRepository<Tag> _tagRepository;
         private readonly GenericRepository<PostTag> _postTagRepository;
         private readonly GenericRepository<Share> _shareRepository;
+        private readonly GenericRepository<Group> _groupRepository;
+        private readonly IGroupService _groupService;
 
         public PostService(
             GenericRepository<Post> postRepository,
@@ -25,7 +28,9 @@ namespace SocialNetworkMobile.Services.Services
             GenericRepository<Comment> commentRepository,
             GenericRepository<Tag> tagRepository,
             GenericRepository<PostTag> postTagRepository,
-            GenericRepository<Share> shareRepository)
+            GenericRepository<Share> shareRepository,
+            GenericRepository<Group> groupRepository,
+            IGroupService groupService)
         {
             _postRepository = postRepository;
             _userRepository = userRepository;
@@ -34,6 +39,8 @@ namespace SocialNetworkMobile.Services.Services
             _tagRepository = tagRepository;
             _postTagRepository = postTagRepository;
             _shareRepository = shareRepository;
+            _groupRepository = groupRepository;
+            _groupService = groupService;
         }
 
         public async Task<PostResponse> CreatePostAsync(CreatePostRequest request)
@@ -42,12 +49,30 @@ namespace SocialNetworkMobile.Services.Services
             if (user == null)
                 throw new ArgumentException("User not found");
 
+            // Kiểm tra quyền đăng bài trong group
+            if (request.GroupId.HasValue)
+            {
+                var group = await _groupRepository.GetByIdAsync(request.GroupId.Value);
+                if (group == null)
+                    throw new ArgumentException("Group not found");
+
+                // Kiểm tra user có phải member của group không
+                var isMember = await _groupService.IsMemberAsync(request.GroupId.Value, request.UserId);
+                if (!isMember)
+                    throw new UnauthorizedAccessException("Bạn không có quyền đăng bài trong nhóm này");
+
+                // Kiểm tra group có active không
+                if (!group.IsActive)
+                    throw new ArgumentException("Nhóm này đã bị vô hiệu hóa");
+            }
+
             var post = new Post
             {
                 UserId = request.UserId,
                 Content = request.Content,
                 ImageUrl = request.ImageUrl,
                 VideoUrl = request.VideoUrl,
+                GroupId = request.GroupId,
                 IsPublic = true,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
@@ -163,6 +188,20 @@ namespace SocialNetworkMobile.Services.Services
                 });
             }
             response.Shares = shareResponses;
+
+            // Get group info if GroupId is present
+            if (post.GroupId.HasValue)
+            {
+                var group = await _groupRepository.GetByIdAsync(post.GroupId.Value);
+                if (group != null)
+                {
+                    response.Group = group.Adapt<GroupResponse>();
+                    if (group.CreatedBy != null)
+                    {
+                        response.Group.CreatedBy = group.CreatedBy.Adapt<UserResponse>();
+                    }
+                }
+            }
 
             return response;
         }
@@ -536,11 +575,30 @@ namespace SocialNetworkMobile.Services.Services
 
         public async Task<List<PostResponse>> GetFeedPostsAsync(int userId, int page = 1, int pageSize = 10)
         {
-            // For now, return all public posts. In a real app, you'd filter by followed users
-            var posts = await _postRepository.GetAllAsync(p => p.IsDeleted == false && p.IsPublic == true);
+            // Get all public posts and group posts that user has access to
+            var allPosts = await _postRepository.GetAllAsync(p => p.IsDeleted == false && p.IsPublic == true);
+            var filteredPosts = new List<Post>();
+            
+            foreach (var post in allPosts)
+            {
+                // If post is not in a group, include it
+                if (!post.GroupId.HasValue)
+                {
+                    filteredPosts.Add(post);
+                }
+                else
+                {
+                    // If post is in a group, check if user is a member
+                    var isMember = await _groupService.IsMemberAsync(post.GroupId.Value, userId);
+                    if (isMember)
+                    {
+                        filteredPosts.Add(post);
+                    }
+                }
+            }
             var responses = new List<PostResponse>();
 
-            foreach (var post in posts)
+            foreach (var post in filteredPosts)
             {
                 var response = post.Adapt<PostResponse>();
                 
@@ -572,6 +630,20 @@ namespace SocialNetworkMobile.Services.Services
                     });
                 }
                 response.Shares = shareResponses;
+
+                // Get group info if GroupId is present
+                if (post.GroupId.HasValue)
+                {
+                    var group = await _groupRepository.GetByIdAsync(post.GroupId.Value);
+                    if (group != null)
+                    {
+                        response.Group = group.Adapt<GroupResponse>();
+                        if (group.CreatedBy != null)
+                        {
+                            response.Group.CreatedBy = group.CreatedBy.Adapt<UserResponse>();
+                        }
+                    }
+                }
 
                 responses.Add(response);
             }
@@ -864,6 +936,95 @@ namespace SocialNetworkMobile.Services.Services
                 response.ShareCount = shareResponses.Count;
                 response.IsShared = await _shareRepository.GetAllAsync(s => s.PostId == post.Id && s.UserId == currentUserId).ContinueWith(t => t.Result.Any());
 
+                // Get group info if GroupId is present
+                if (post.GroupId.HasValue)
+                {
+                    var group = await _groupRepository.GetByIdAsync(post.GroupId.Value);
+                    if (group != null)
+                    {
+                        response.Group = group.Adapt<GroupResponse>();
+                        if (group.CreatedBy != null)
+                        {
+                            response.Group.CreatedBy = group.CreatedBy.Adapt<UserResponse>();
+                        }
+                    }
+                }
+
+                responses.Add(response);
+            }
+
+            return responses;
+        }
+
+        public async Task<List<PostResponse>> GetPostsByGroupIdAsync(int groupId)
+        {
+            var posts = await _postRepository.GetAllAsync(p => p.GroupId == groupId && p.IsDeleted == false);
+            var responses = new List<PostResponse>();
+
+            foreach (var post in posts.OrderByDescending(p => p.CreatedAt))
+            {
+                var response = await GetPostByIdAsync(post.Id);
+                responses.Add(response);
+            }
+
+            return responses;
+        }
+
+        public async Task<List<PostResponse>> GetPostsByGroupIdWithLikesAsync(int groupId, int currentUserId)
+        {
+            var posts = await _postRepository.GetAllAsync(p => p.GroupId == groupId && p.IsDeleted == false);
+            var responses = new List<PostResponse>();
+
+            foreach (var post in posts.OrderByDescending(p => p.CreatedAt))
+            {
+                var response = post.Adapt<PostResponse>();
+                
+                // Get user info
+                var user = await _userRepository.GetByIdAsync(post.UserId);
+                response.User = user.Adapt<UserResponse>();
+
+                // Get tags
+                var postTags = await _postTagRepository.GetAllAsync(pt => pt.PostId == post.Id);
+                var tagIds = postTags.Select(pt => pt.TagId).ToList();
+                var tags = await _tagRepository.GetAllAsync(t => tagIds.Contains(t.Id));
+                response.Tags = tags.Adapt<List<TagResponse>>();
+
+                // Get likes with user info
+                var likes = await _likeRepository.GetAllAsync(l => l.PostId == post.Id);
+                var likeResponses = new List<LikeResponse>();
+                foreach (var like in likes)
+                {
+                    var likeUser = await _userRepository.GetByIdAsync(like.UserId);
+                    likeResponses.Add(new LikeResponse
+                    {
+                        Id = like.Id,
+                        PostId = like.PostId ?? 0,
+                        UserId = like.UserId,
+                        LikeType = like.LikeType,
+                        CreatedAt = like.CreatedAt,
+                        User = likeUser.Adapt<UserResponse>()
+                    });
+                }
+                response.Likes = likeResponses;
+                response.LikeCount = likeResponses.Count;
+                
+                // Check if current user has liked this post
+                response.IsLiked = await _likeRepository.GetAllAsync(l => l.PostId == post.Id && l.UserId == currentUserId).ContinueWith(t => t.Result.Any());
+
+                // Get group info if GroupId is present
+                if (post.GroupId.HasValue)
+                {
+                    var group = await _groupRepository.GetByIdAsync(post.GroupId.Value);
+                    if (group != null)
+                    {
+                        response.Group = group.Adapt<GroupResponse>();
+                        if (group.CreatedBy != null)
+                        {
+                            response.Group.CreatedBy = group.CreatedBy.Adapt<UserResponse>();
+                        }
+                    }
+                }
+                
                 responses.Add(response);
             }
 

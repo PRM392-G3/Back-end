@@ -42,6 +42,9 @@ namespace SocialNetworkMobile.Repository.Models
         [Column("IsDeleted")]
         public bool IsDeleted { get; set; } = false;
 
+        [Column("GroupId")]
+        public int? GroupId { get; set; }
+
         [Column("CreatedAt")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
@@ -51,6 +54,9 @@ namespace SocialNetworkMobile.Repository.Models
         // Navigation properties
         [ForeignKey("UserId")]
         public virtual User User { get; set; } = null!;
+
+        [ForeignKey("GroupId")]
+        public virtual Group? Group { get; set; }
         
         public virtual ICollection<Comment> Comments { get; set; } = new List<Comment>();
         public virtual ICollection<Like> Likes { get; set; } = new List<Like>();
