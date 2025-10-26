@@ -32,6 +32,11 @@ namespace SocialNetworkMobile.Repository.Context
         public virtual DbSet<Share> Shares { get; set; }
         public virtual DbSet<Reel> Reels { get; set; }
         public virtual DbSet<ReelMusic> ReelMusics { get; set; }
+        
+        // Chat tables
+        public virtual DbSet<Conversation> Conversations { get; set; }
+        public virtual DbSet<Message> Messages { get; set; }
+        public virtual DbSet<GroupChatMessage> GroupChatMessages { get; set; }
 
         public static string GetConnectionString(string connectionStringName)
         {
