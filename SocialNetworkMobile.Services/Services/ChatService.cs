@@ -121,6 +121,8 @@ namespace SocialNetworkMobile.Services.Services
                 GroupId = request.GroupId,
                 SenderId = request.SenderId,
                 Content = request.Content,
+                ImageUrl = request.ImageUrl,
+                VideoUrl = request.VideoUrl,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -199,6 +201,8 @@ namespace SocialNetworkMobile.Services.Services
                 SenderName = message.Sender?.FullName ?? "Unknown",
                 SenderAvatarUrl = message.Sender?.AvatarUrl ?? "",
                 Content = message.Content ?? "",
+                ImageUrl = message.ImageUrl,
+                VideoUrl = message.VideoUrl,
                 CreatedAt = message.CreatedAt
             };
         }

@@ -10,7 +10,12 @@ namespace SocialNetworkMobile.Services.Object.Requests
         [Required]
         public int SenderId { get; set; }
 
-        [Required]
         public string Content { get; set; } = string.Empty;
+
+        [MaxLength(500)]
+        public string? ImageUrl { get; set; }
+
+        [MaxLength(500)]
+        public string? VideoUrl { get; set; }
     }
 }

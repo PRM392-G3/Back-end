@@ -21,6 +21,14 @@ namespace SocialNetworkMobile.Repository.Models
         [Column("content")]
         public string? Content { get; set; }
 
+        [MaxLength(500)]
+        [Column("imageurl")]
+        public string? ImageUrl { get; set; }
+
+        [MaxLength(500)]
+        [Column("videourl")]
+        public string? VideoUrl { get; set; }
+
         [Column("createdat")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
