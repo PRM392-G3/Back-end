@@ -23,12 +23,24 @@ namespace SocialNetworkMobile.Controllers
         {
             try
             {
+                var currentUserId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+                if (currentUserId == 0)
+                    return Unauthorized(new { error = "Invalid user token" });
+
+                // Validate that the user is creating post for themselves
+                if (request.UserId != currentUserId)
+                    return BadRequest("You can only create posts for yourself");
+
                 var post = await _postService.CreatePostAsync(request);
                 return CreatedAtAction(nameof(GetPost), new { id = post.Id }, post);
             }
             catch (ArgumentException ex)
             {
                 return BadRequest(ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Forbid(ex.Message);
             }
         }
 

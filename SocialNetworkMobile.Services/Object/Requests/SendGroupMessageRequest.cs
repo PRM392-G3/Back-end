@@ -2,13 +2,14 @@ using System.ComponentModel.DataAnnotations;
 
 namespace SocialNetworkMobile.Services.Object.Requests
 {
-    public class CreatePostRequest
+    public class SendGroupMessageRequest
     {
         [Required]
-        public int UserId { get; set; }
+        public int GroupId { get; set; }
 
         [Required]
-        [MaxLength(2000)]
+        public int SenderId { get; set; }
+
         public string Content { get; set; } = string.Empty;
 
         [MaxLength(500)]
@@ -16,9 +17,5 @@ namespace SocialNetworkMobile.Services.Object.Requests
 
         [MaxLength(500)]
         public string? VideoUrl { get; set; }
-
-        public List<string>? Tags { get; set; }
-
-        public int? GroupId { get; set; }
     }
 }

@@ -11,10 +11,12 @@ namespace SocialNetworkMobile.Controllers
     public class GroupController : ControllerBase
     {
         private readonly IGroupService _groupService;
+        private readonly IPostService _postService;
 
-        public GroupController(IGroupService groupService)
+        public GroupController(IGroupService groupService, IPostService postService)
         {
             _groupService = groupService;
+            _postService = postService;
         }
 
         #region Group Management
@@ -651,6 +653,54 @@ namespace SocialNetworkMobile.Controllers
         {
             var count = await _groupService.GetGroupMemberCountAsync(groupId);
             return Ok(new { memberCount = count });
+        }
+
+        #endregion
+
+        #region Posts
+
+        /// <summary>
+        /// Lấy danh sách bài viết trong nhóm
+        /// </summary>
+        [HttpGet("{groupId}/posts")]
+        [Authorize]
+        public async Task<ActionResult<List<PostResponse>>> GetGroupPosts(int groupId)
+        {
+            try
+            {
+                var currentUserId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+                if (currentUserId == 0)
+                    return Unauthorized(new { error = "Invalid user token" });
+
+                var posts = await _postService.GetPostsByGroupIdWithLikesAsync(groupId, currentUserId);
+                return Ok(posts);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Lấy danh sách bài viết trong nhóm với thông tin likes
+        /// </summary>
+        [HttpGet("{groupId}/posts/with-likes")]
+        [Authorize]
+        public async Task<ActionResult<List<PostResponse>>> GetGroupPostsWithLikes(int groupId)
+        {
+            try
+            {
+                var currentUserId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+                if (currentUserId == 0)
+                    return Unauthorized(new { error = "Invalid user token" });
+
+                var posts = await _postService.GetPostsByGroupIdWithLikesAsync(groupId, currentUserId);
+                return Ok(posts);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         #endregion

@@ -21,5 +21,7 @@ namespace SocialNetworkMobile.Services.Interfaces
         Task<List<UserResponse>> GetPostLikesAsync(int postId);
         Task<List<PostResponse>> SearchPostsAsync(string searchTerm);
         Task<List<PostResponse>> GetPostsByTagAsync(string tagName);
+        Task<List<PostResponse>> GetPostsByGroupIdAsync(int groupId);
+        Task<List<PostResponse>> GetPostsByGroupIdWithLikesAsync(int groupId, int currentUserId);
     }
 }
