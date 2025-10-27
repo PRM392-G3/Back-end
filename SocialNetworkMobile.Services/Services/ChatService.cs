@@ -10,10 +10,14 @@ namespace SocialNetworkMobile.Services.Services
     public class ChatService : IChatService
     {
         private readonly SocialNetworkDbContext _context;
+        private readonly INotificationService _notificationService;
 
-        public ChatService(SocialNetworkDbContext context)
+        public ChatService(
+            SocialNetworkDbContext context,
+            INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         public async Task<ConversationResponse> CreateConversationAsync(CreateConversationRequest request)
@@ -92,6 +96,43 @@ namespace SocialNetworkMobile.Services.Services
             _context.Messages.Add(message);
             await _context.SaveChangesAsync();
 
+            // Get conversation and sender to identify recipient
+            var conversation = await _context.Conversations
+                .Include(c => c.User1)
+                .Include(c => c.User2)
+                .FirstOrDefaultAsync(c => c.Id == request.ConversationId);
+
+            if (conversation != null)
+            {
+                // Determine recipient (the other user in the conversation)
+                int recipientId = conversation.User1Id == request.SenderId 
+                    ? conversation.User2Id 
+                    : conversation.User1Id;
+
+                var sender = await _context.Users.FindAsync(request.SenderId);
+                var recipient = await _context.Users.FindAsync(recipientId);
+
+                if (sender != null && recipient != null)
+                {
+                    try
+                    {
+                        // Create in-app notification
+                        await _notificationService.CreateNotificationAsync(new SocialNetworkMobile.Services.Object.Requests.CreateNotificationRequest
+                        {
+                            UserId = recipientId,
+                            FromUserId = request.SenderId,
+                            Type = "MESSAGE",
+                            Title = $"Tin nhắn mới từ {sender.FullName}",
+                            Message = request.Content ?? "Đã gửi một tin nhắn"
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[ChatService] Error creating notification: {ex.Message}");
+                    }
+                }
+            }
+
             return await GetMessageResponseAsync(message);
         }
 
@@ -128,6 +169,36 @@ namespace SocialNetworkMobile.Services.Services
 
             _context.GroupChatMessages.Add(message);
             await _context.SaveChangesAsync();
+
+            // Get group and sender info for notifications
+            var group = await _context.Groups
+                .Include(g => g.Members)
+                .FirstOrDefaultAsync(g => g.Id == request.GroupId);
+            
+            var sender = await _context.Users.FindAsync(request.SenderId);
+
+            if (group != null && sender != null)
+            {
+                // Notify all group members except sender
+                foreach (var member in group.Members.Where(m => m.UserId != request.SenderId))
+                {
+                    try
+                    {
+                        await _notificationService.CreateNotificationAsync(new SocialNetworkMobile.Services.Object.Requests.CreateNotificationRequest
+                        {
+                            UserId = member.UserId,
+                            FromUserId = request.SenderId,
+                            Type = "GROUP_MESSAGE",
+                            Title = $"Tin nhắn mới trong {group.Name}",
+                            Message = $"{sender.FullName}: {request.Content ?? "Đã gửi một tin nhắn"}"
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[ChatService] Error creating group notification: {ex.Message}");
+                    }
+                }
+            }
 
             return await GetGroupChatMessageResponseAsync(message);
         }

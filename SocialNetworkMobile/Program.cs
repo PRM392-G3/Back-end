@@ -11,6 +11,7 @@ using SocialNetworkMobile.Repository.Context;
 using SocialNetworkMobile.Services.Interfaces;
 using SocialNetworkMobile.Services.Services;
 using SocialNetworkMobile.Services.Services.Authentication;
+using SocialNetworkMobile.Hubs;
 using Supabase;
 using System.Text;
 using Mapster;
@@ -110,10 +111,41 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
+        // Allow specific origins + localhost for development
+        policy.WithOrigins(
+                "http://localhost:8081",
+                "http://localhost:3000",
+                "http://192.168.1.3:8081",
+                "https://2fefeca44269.ngrok-free.app"
+              )
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials(); // Enable credentials for SignalR
     });
+});
+
+// ================= CẤU HÌNH SESSION & COOKIES =================
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromDays(365); // 1 year (maximum for persistent login)
+    options.Cookie.Name = ".Nexora.Session";
+    options.Cookie.HttpOnly = true; // Protect against XSS
+    options.Cookie.IsEssential = true;
+    options.Cookie.SameSite = SameSiteMode.None; // Allow cross-site for mobile apps
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+});
+
+// Permanent cookie configuration
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.ExpireTimeSpan = TimeSpan.FromDays(365);
+    options.SlidingExpiration = false; // Do not extend on activity
+    options.Cookie.Name = ".Nexora.Auth";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.Cookie.SameSite = SameSiteMode.None;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 });
 
 // ================= CẤU HÌNH SWAGGER =================
@@ -147,6 +179,12 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// ================= CẤU HÌNH SIGNALR =================
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = true;
+});
+
 // ================= CẤU HÌNH CONTROLLERS =================
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
@@ -161,11 +199,16 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "swagger";
 });
 
+app.UseSession(); // Session middleware
 app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// ================= SIGNALR HUB ROUTING =================
+app.MapHub<SocialNetworkMobile.Hubs.ChatHub>("/chathub").RequireAuthorization();
+
 app.Run();
 
 // ================= AUTHENTICATION CONFIGURATION FUNCTION =================
