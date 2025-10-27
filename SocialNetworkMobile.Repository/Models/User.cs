@@ -62,6 +62,10 @@ namespace SocialNetworkMobile.Repository.Models
         [Column("UpdatedAt")]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+        [MaxLength(1024)]
+        [Column("FcmToken")]
+        public string? FcmToken { get; set; }
+
     // Navigation properties
     public virtual ICollection<Post> Posts { get; set; } = new List<Post>();
     public virtual ICollection<Comment> Comments { get; set; } = new List<Comment>();

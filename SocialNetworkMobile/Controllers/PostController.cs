@@ -118,6 +118,30 @@ namespace SocialNetworkMobile.Controllers
             }
         }
 
+        /// <summary>
+        /// ✅ TỐI ƯU N+1: Endpoint mới cho optimized feed
+        /// Chỉ load METADATA (số like, comment, share) - Comments lazy load khi user bấm
+        /// </summary>
+        [HttpGet("optimized-feed")]
+        [Authorize]
+        public async Task<ActionResult> GetOptimizedFeed([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        {
+            try
+            {
+                var currentUserId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+                if (currentUserId == 0)
+                    return Unauthorized(new { error = "Invalid user token" });
+
+                var posts = await _postService.GetOptimizedPostsFeedAsync(currentUserId, page, pageSize);
+                // Return as array directly, not wrapped
+                return Ok(new { posts, currentPage = page, pageSize, hasMore = posts.Count >= pageSize });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpPut("{id}")]
         [Authorize]
         public async Task<ActionResult<PostResponse>> UpdatePost(int id, [FromBody] UpdatePostRequest request)
@@ -156,6 +180,14 @@ namespace SocialNetworkMobile.Controllers
         {
             try
             {
+                // Verify userId in URL matches authenticated user
+                var currentUserId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+                if (currentUserId == 0)
+                    return Unauthorized(new { error = "Invalid user token" });
+                
+                if (currentUserId != userId)
+                    return Forbid("You can only like on behalf of yourself");
+                
                 var result = await _postService.LikePostAsync(userId, postId);
                 if (result)
                     return Ok(new { message = "Post liked successfully" });
@@ -173,6 +205,14 @@ namespace SocialNetworkMobile.Controllers
         {
             try
             {
+                // Verify userId in URL matches authenticated user
+                var currentUserId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+                if (currentUserId == 0)
+                    return Unauthorized(new { error = "Invalid user token" });
+                
+                if (currentUserId != userId)
+                    return Forbid("You can only unlike on behalf of yourself");
+                
                 var result = await _postService.UnlikePostAsync(userId, postId);
                 if (result)
                     return Ok(new { message = "Post unliked successfully" });

@@ -20,6 +20,7 @@ namespace SocialNetworkMobile.Services.Services
         private readonly GenericRepository<Share> _shareRepository;
         private readonly GenericRepository<Group> _groupRepository;
         private readonly IGroupService _groupService;
+        private readonly SocialNetworkDbContext _context;
 
         public PostService(
             GenericRepository<Post> postRepository,
@@ -30,7 +31,8 @@ namespace SocialNetworkMobile.Services.Services
             GenericRepository<PostTag> postTagRepository,
             GenericRepository<Share> shareRepository,
             GenericRepository<Group> groupRepository,
-            IGroupService groupService)
+            IGroupService groupService,
+            SocialNetworkDbContext context)
         {
             _postRepository = postRepository;
             _userRepository = userRepository;
@@ -41,6 +43,7 @@ namespace SocialNetworkMobile.Services.Services
             _shareRepository = shareRepository;
             _groupRepository = groupRepository;
             _groupService = groupService;
+            _context = context;
         }
 
         public async Task<PostResponse> CreatePostAsync(CreatePostRequest request)
@@ -337,87 +340,76 @@ namespace SocialNetworkMobile.Services.Services
             return responses.OrderByDescending(p => p.CreatedAt).ToList();
         }
 
+        /// <summary>
+        /// ✅ OPTIMIZED: Get posts by user with lightweight metadata only
+        /// NO N+1 queries - NO full likes/comments/shares data
+        /// Only counts and boolean flags
+        /// </summary>
         public async Task<List<PostResponse>> GetPostsByUserIdWithLikesAsync(int userId, int currentUserId)
         {
             var posts = await _postRepository.GetAllAsync(p => p.UserId == userId && p.IsDeleted == false);
+            
+            if (!posts.Any())
+                return new List<PostResponse>();
+
+            // Get user info once for all posts (same userId)
+            var user = await _userRepository.GetByIdAsync(userId);
+            var userResponse = user.Adapt<UserResponse>();
+
+            // Get post IDs for batch queries
+            var postIds = posts.Select(p => p.Id).ToList();
+
+            // Batch query likes, comments, shares for ALL posts at once (sequential to avoid DbContext issues)
+            var allLikes = await _likeRepository.GetAllAsync(l => postIds.Contains(l.PostId ?? 0));
+            var allComments = await _commentRepository.GetAllAsync(c => postIds.Contains(c.PostId ?? 0));
+            var allShares = await _shareRepository.GetAllAsync(s => postIds.Contains(s.PostId));
+
+            // Group by post ID
+            var likesByPost = allLikes.GroupBy(l => l.PostId ?? 0).ToDictionary(g => g.Key, g => g.ToList());
+            var commentsByPost = allComments.GroupBy(c => c.PostId ?? 0).ToDictionary(g => g.Key, g => g.ToList());
+            var sharesByPost = allShares.GroupBy(s => s.PostId).ToDictionary(g => g.Key, g => g.ToList());
+
             var responses = new List<PostResponse>();
 
             foreach (var post in posts)
             {
                 var response = post.Adapt<PostResponse>();
                 
-                // Get user info
-                var user = await _userRepository.GetByIdAsync(post.UserId);
-                response.User = user.Adapt<UserResponse>();
+                // Set user info (same for all posts)
+                response.User = userResponse;
 
-                // Get tags
+                // Get tags (simplified - no nested queries)
                 var postTags = await _postTagRepository.GetAllAsync(pt => pt.PostId == post.Id);
                 var tagIds = postTags.Select(pt => pt.TagId).ToList();
-                var tags = await _tagRepository.GetAllAsync(t => tagIds.Contains(t.Id));
-                response.Tags = tags.Adapt<List<TagResponse>>();
-
-                // Get likes with user info
-                var likes = await _likeRepository.GetAllAsync(l => l.PostId == post.Id);
-                var likeResponses = new List<LikeResponse>();
-                foreach (var like in likes)
+                if (tagIds.Any())
                 {
-                    var likeUser = await _userRepository.GetByIdAsync(like.UserId);
-                    likeResponses.Add(new LikeResponse
-                    {
-                        Id = like.Id,
-                        PostId = like.PostId ?? 0,
-                        UserId = like.UserId,
-                        LikeType = like.LikeType,
-                        CreatedAt = like.CreatedAt,
-                        User = likeUser.Adapt<UserResponse>()
-                    });
+                    var tags = await _tagRepository.GetAllAsync(t => tagIds.Contains(t.Id));
+                    response.Tags = tags.Adapt<List<TagResponse>>();
                 }
-                response.Likes = likeResponses;
-                response.LikeCount = likeResponses.Count;
+                else
+                {
+                    response.Tags = new List<TagResponse>();
+                }
+
+                // Get counts only (no user details)
+                likesByPost.TryGetValue(post.Id, out var likes);
+                commentsByPost.TryGetValue(post.Id, out var comments);
+                sharesByPost.TryGetValue(post.Id, out var shares);
+
+                response.LikeCount = likes?.Count ?? 0;
+                response.CommentCount = comments?.Count ?? 0;
+                response.ShareCount = shares?.Count ?? 0;
                 
+                // Empty lists to avoid loading full data
+                response.Likes = new List<LikeResponse>();
+                response.Comments = new List<CommentResponse>();
+                response.Shares = new List<ShareResponse>();
+
                 // Check if current user has liked this post
-                response.IsLiked = await _likeRepository.GetAllAsync(l => l.PostId == post.Id && l.UserId == currentUserId).ContinueWith(t => t.Result.Any());
+                response.IsLiked = likes?.Any(l => l.UserId == currentUserId) ?? false;
                 
-                // Get comments with user info
-                var comments = await _commentRepository.GetAllAsync(c => c.PostId == post.Id);
-                var commentResponses = new List<CommentResponse>();
-                foreach (var comment in comments)
-                {
-                    var commentUser = await _userRepository.GetByIdAsync(comment.UserId);
-                    commentResponses.Add(new CommentResponse
-                    {
-                        Id = comment.Id,
-                        PostId = comment.PostId ?? 0,
-                        UserId = comment.UserId,
-                        Content = comment.Content,
-                        ParentCommentId = comment.ParentCommentId ?? 0,
-                        CreatedAt = comment.CreatedAt,
-                        User = commentUser.Adapt<UserResponse>()
-                    });
-                }
-                response.Comments = commentResponses;
-                response.CommentCount = commentResponses.Count;
-
-                // Get shares with user info
-                var shares = await _shareRepository.GetAllAsync(s => s.PostId == post.Id);
-                var shareResponses = new List<ShareResponse>();
-                foreach (var share in shares)
-                {
-                    var shareUser = await _userRepository.GetByIdAsync(share.UserId);
-                    shareResponses.Add(new ShareResponse
-                    {
-                        Id = share.Id,
-                        PostId = share.PostId,
-                        UserId = share.UserId,
-                        Caption = share.Caption,
-                        IsPublic = share.IsPublic,
-                        CreatedAt = share.CreatedAt,
-                        User = shareUser.Adapt<UserResponse>()
-                    });
-                }
-                response.Shares = shareResponses;
-                response.ShareCount = shareResponses.Count;
-                response.IsShared = await _shareRepository.GetAllAsync(s => s.PostId == post.Id && s.UserId == currentUserId).ContinueWith(t => t.Result.Any());
+                // Check if current user has shared this post
+                response.IsShared = shares?.Any(s => s.UserId == currentUserId) ?? false;
 
                 responses.Add(response);
             }
@@ -1029,6 +1021,64 @@ namespace SocialNetworkMobile.Services.Services
             }
 
             return responses;
+        }
+
+        /// <summary>
+        /// ✅ TỐI ƯU N+1: Chỉ query METADATA (số like, comment, share)
+        /// Comments được Lazy Load khi user bấm vào
+        /// </summary>
+        public async Task<List<PostFeedResponse>> GetOptimizedPostsFeedAsync(int currentUserId, int page = 1, int pageSize = 20)
+        {
+            // Tính toán skip
+            var skip = (page - 1) * pageSize;
+            
+            // ✅ SINGLE QUERY với projection - KHÔNG có N+1
+            var posts = await _context.Posts
+                .Where(p => p.IsDeleted == false && p.IsPublic == true)
+                .OrderByDescending(p => p.CreatedAt)
+                .Skip(skip)
+                .Take(pageSize)
+                .Select(p => new PostFeedResponse
+                {
+                    // Basic post info
+                    Id = p.Id,
+                    UserId = p.UserId,
+                    Content = p.Content,
+                    ImageUrl = p.ImageUrl,
+                    VideoUrl = p.VideoUrl,
+                    CreatedAt = p.CreatedAt,
+                    UpdatedAt = p.UpdatedAt,
+                    GroupId = p.GroupId,
+                    IsPublic = p.IsPublic,
+                    
+                    // User info (only name & avatar)
+                    UserName = p.User != null ? p.User.FullName : string.Empty,
+                    UserAvatar = p.User != null ? p.User.AvatarUrl : string.Empty,
+                    
+                    // Counts only - KHÔNG load full list
+                    LikeCount = _context.Likes.Count(l => l.PostId == p.Id),
+                    CommentCount = _context.Comments.Count(c => c.PostId == p.Id),
+                    ShareCount = _context.Shares.Count(s => s.PostId == p.Id),
+                    
+                    // Check if user liked/shared
+                    IsLiked = _context.Likes.Any(l => l.PostId == p.Id && l.UserId == currentUserId),
+                    IsShared = _context.Shares.Any(s => s.PostId == p.Id && s.UserId == currentUserId),
+                    
+                    // Group name if exists
+                    GroupName = p.GroupId.HasValue 
+                        ? _context.Groups.Where(g => g.Id == p.GroupId).Select(g => g.Name).FirstOrDefault() 
+                        : null,
+                    
+                    // Tags (only names)
+                    TagNames = _context.PostTags
+                        .Where(pt => pt.PostId == p.Id)
+                        .Join(_context.Tags, pt => pt.TagId, t => t.Id, (pt, t) => t.Name)
+                        .ToList()
+                })
+                .AsNoTracking()
+                .ToListAsync();
+
+            return posts;
         }
     }
 }

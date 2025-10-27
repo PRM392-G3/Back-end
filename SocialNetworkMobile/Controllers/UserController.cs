@@ -48,6 +48,29 @@ namespace SocialNetworkMobile.Controllers
         }
 
         /// <summary>
+        /// ✅ OPTIMIZED: Get lightweight user profile (fast loading)
+        /// Only returns essential info for quick preview
+        /// </summary>
+        [HttpGet("{id}/profile")]
+        public async Task<ActionResult<UserProfileResponse>> GetUserProfile(int id)
+        {
+            try
+            {
+                int? currentUserId = null;
+                var userIdClaim = User.FindFirst("userId")?.Value;
+                if (!string.IsNullOrEmpty(userIdClaim))
+                    currentUserId = int.Parse(userIdClaim);
+
+                var profile = await _userService.GetUserProfileAsync(id, currentUserId);
+                return Ok(profile);
+            }
+            catch (ArgumentException ex)
+            {
+                return NotFound(ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Search users by name (case-insensitive)
         /// </summary>
         [HttpGet("search")]
@@ -463,6 +486,34 @@ namespace SocialNetworkMobile.Controllers
             {
                 var suggestions = await _friendshipService.GetFriendSuggestionsAsync(userId, limit);
                 return Ok(suggestions);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Update FCM token for a user
+        /// </summary>
+        [HttpPut("{userId}/fcm-token")]
+        [Authorize]
+        public async Task<ActionResult> UpdateFcmToken(int userId, [FromBody] UpdateFcmTokenRequest request)
+        {
+            try
+            {
+                var currentUserId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+                if (currentUserId == 0)
+                    return Unauthorized(new { error = "Invalid user token" });
+                
+                // Verify user can only update their own FCM token
+                if (userId != currentUserId)
+                    return Forbid();
+
+                var result = await _userService.UpdateFcmTokenAsync(userId, request.FcmToken);
+                if (result)
+                    return Ok(new { message = "FCM token updated successfully" });
+                return NotFound(new { error = "User not found" });
             }
             catch (ArgumentException ex)
             {
