@@ -14,19 +14,22 @@ namespace SocialNetworkMobile.Services.Services
         private readonly GenericRepository<Post> _postRepository;
         private readonly GenericRepository<Reel> _reelRepository;
         private readonly GenericRepository<Like> _likeRepository;
+        private readonly INotificationService _notificationService;
 
         public CommentService(
             GenericRepository<Comment> commentRepository,
             GenericRepository<User> userRepository,
             GenericRepository<Post> postRepository,
             GenericRepository<Reel> reelRepository,
-            GenericRepository<Like> likeRepository)
+            GenericRepository<Like> likeRepository,
+            INotificationService notificationService)
         {
             _commentRepository = commentRepository;
             _userRepository = userRepository;
             _postRepository = postRepository;
             _reelRepository = reelRepository;
             _likeRepository = likeRepository;
+            _notificationService = notificationService;
         }
 
         public async Task<CommentResponse> CreateCommentAsync(CreateCommentRequest request)
@@ -74,8 +77,31 @@ namespace SocialNetworkMobile.Services.Services
             // Update comment count for the associated post or reel
             if (comment.PostId.HasValue)
             {
-                // Update post comment count if needed
-                // This would require PostService integration
+                // ✅ Tạo notification cho post owner (và tự động gửi FCM)
+                var post = await _postRepository.GetByIdAsync(comment.PostId.Value);
+                if (post != null && post.UserId != request.UserId) // Không notify chính mình
+                {
+                    try
+                    {
+                        var commenter = await _userRepository.GetByIdAsync(request.UserId);
+                        Console.WriteLine($"[CommentService] Creating notification for comment on post {comment.PostId.Value}");
+                        await _notificationService.CreateNotificationAsync(new CreateNotificationRequest
+                        {
+                            UserId = post.UserId, // Post owner
+                            FromUserId = request.UserId, // Commenter
+                            Type = "COMMENT",
+                            Title = "Bình luận mới",
+                            Message = $"{commenter?.FullName} đã bình luận: {request.Content.Substring(0, Math.Min(50, request.Content.Length))}...",
+                            PostId = comment.PostId.Value,
+                            CommentId = comment.Id
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[CommentService] Error creating notification: {ex.Message}");
+                        // Don't throw - notification failure shouldn't break comment creation
+                    }
+                }
             }
             else if (comment.ReelId.HasValue)
             {

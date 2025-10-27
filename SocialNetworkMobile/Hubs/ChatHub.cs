@@ -4,6 +4,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using SocialNetworkMobile.Services.Interfaces;
+using SocialNetworkMobile.Services.Object.Requests;
+using SocialNetworkMobile.Services.Object.Responses;
 
 namespace SocialNetworkMobile.Hubs
 {
@@ -12,6 +15,15 @@ namespace SocialNetworkMobile.Hubs
     {
         // User connection tracking
         private static readonly Dictionary<string, string> ConnectedUsers = new Dictionary<string, string>();
+        
+        private readonly IChatService _chatService;
+        private readonly INotificationService _notificationService;
+
+        public ChatHub(IChatService chatService, INotificationService notificationService)
+        {
+            _chatService = chatService;
+            _notificationService = notificationService;
+        }
 
         public override async Task OnConnectedAsync()
         {
@@ -38,38 +50,47 @@ namespace SocialNetworkMobile.Hubs
         }
 
         // Send message to specific user
-        public async Task SendMessageToUser(string toUserId, string message, int conversationId)
+        public async Task SendMessageToUser(string toUserId, string content, int conversationId)
         {
             var fromUserId = Context.User?.Identity?.Name;
             if (fromUserId == null) return;
 
-            // Find user's connection(s)
-            var targetConnections = ConnectedUsers
-                .Where(x => x.Value == toUserId)
-                .Select(x => x.Key)
-                .ToList();
-
-            if (targetConnections.Any())
+            try
             {
-                await Clients.Clients(targetConnections).SendAsync("ReceiveMessage", new
+                // Save message to database
+                var messageRequest = new SendMessageRequest
                 {
-                    fromUserId,
-                    message,
-                    conversationId,
-                    timestamp = DateTime.UtcNow
-                });
+                    ConversationId = conversationId,
+                    SenderId = int.Parse(fromUserId),
+                    Content = content,
+                    ImageUrl = null,
+                    VideoUrl = null
+                };
+
+                var savedMessage = await _chatService.SendMessageAsync(messageRequest);
+
+                // Find user's connection(s)
+                var targetConnections = ConnectedUsers
+                    .Where(x => x.Value == toUserId)
+                    .Select(x => x.Key)
+                    .ToList();
+
+                // Send to recipient if online
+                if (targetConnections.Any())
+                {
+                    await Clients.Clients(targetConnections).SendAsync("ReceiveMessage", savedMessage);
+                }
+
+                // Notify sender that message was sent
+                await Clients.Caller.SendAsync("MessageSent", savedMessage);
+
+                Console.WriteLine($"[ChatHub] Message sent from {fromUserId} to {toUserId}");
             }
-
-            // Also notify sender
-            await Clients.Caller.SendAsync("MessageSent", new
+            catch (Exception ex)
             {
-                toUserId,
-                message,
-                conversationId,
-                timestamp = DateTime.UtcNow
-            });
-
-            Console.WriteLine($"[ChatHub] Message sent from {fromUserId} to {toUserId}");
+                await Clients.Caller.SendAsync("ErrorMessage", $"Error sending message: {ex.Message}");
+                Console.WriteLine($"[ChatHub] Error sending message: {ex.Message}");
+            }
         }
 
         // Send message to group

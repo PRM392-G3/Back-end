@@ -20,5 +20,6 @@ namespace SocialNetworkMobile.Services.Object.Responses
         public int FollowingCount { get; set; }
         public int PostsCount { get; set; }
         public bool IsFollowing { get; set; }
+        public string? FcmToken { get; set; }
     }
 }

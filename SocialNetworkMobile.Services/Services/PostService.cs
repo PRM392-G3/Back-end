@@ -19,6 +19,8 @@ namespace SocialNetworkMobile.Services.Services
         private readonly GenericRepository<PostTag> _postTagRepository;
         private readonly GenericRepository<Share> _shareRepository;
         private readonly GenericRepository<Group> _groupRepository;
+        private readonly GenericRepository<Notification> _notificationRepository;
+        private readonly INotificationService _notificationService;
         private readonly IGroupService _groupService;
         private readonly SocialNetworkDbContext _context;
 
@@ -31,6 +33,8 @@ namespace SocialNetworkMobile.Services.Services
             GenericRepository<PostTag> postTagRepository,
             GenericRepository<Share> shareRepository,
             GenericRepository<Group> groupRepository,
+            GenericRepository<Notification> notificationRepository,
+            INotificationService notificationService,
             IGroupService groupService,
             SocialNetworkDbContext context)
         {
@@ -42,6 +46,8 @@ namespace SocialNetworkMobile.Services.Services
             _postTagRepository = postTagRepository;
             _shareRepository = shareRepository;
             _groupRepository = groupRepository;
+            _notificationRepository = notificationRepository;
+            _notificationService = notificationService;
             _groupService = groupService;
             _context = context;
         }
@@ -516,7 +522,8 @@ namespace SocialNetworkMobile.Services.Services
                 response.LikeCount = likeResponses.Count;
                 
                 // Check if current user has liked this post
-                response.IsLiked = await _likeRepository.GetAllAsync(l => l.PostId == post.Id && l.UserId == currentUserId).ContinueWith(t => t.Result.Any());
+                var userLikes = await _likeRepository.GetAllAsync(l => l.PostId == post.Id && l.UserId == currentUserId);
+                response.IsLiked = userLikes.Any();
                 
                 // Get comments with user info
                 var comments = await _commentRepository.GetAllAsync(c => c.PostId == post.Id);
@@ -557,7 +564,8 @@ namespace SocialNetworkMobile.Services.Services
                 }
                 response.Shares = shareResponses;
                 response.ShareCount = shareResponses.Count;
-                response.IsShared = await _shareRepository.GetAllAsync(s => s.PostId == post.Id && s.UserId == currentUserId).ContinueWith(t => t.Result.Any());
+                var userShares = await _shareRepository.GetAllAsync(s => s.PostId == post.Id && s.UserId == currentUserId);
+                response.IsShared = userShares.Any();
 
                 responses.Add(response);
             }
@@ -730,8 +738,32 @@ namespace SocialNetworkMobile.Services.Services
 
             await _likeRepository.CreateAsync(like);
 
-            // Update like count in Post table
+            // ✅ Tạo notification cho post owner (và tự động gửi FCM)
             var post = await _postRepository.GetByIdAsync(postId);
+            if (post != null && post.UserId != userId) // Không notify chính mình
+            {
+                try
+                {
+                    var liker = await _userRepository.GetByIdAsync(userId);
+                    Console.WriteLine($"[PostService] Creating notification for like on post {postId}");
+                    await _notificationService.CreateNotificationAsync(new CreateNotificationRequest
+                    {
+                        UserId = post.UserId, // Post owner
+                        FromUserId = userId, // Liker
+                        Type = "LIKE",
+                        Title = "Thích bài viết của bạn",
+                        Message = $"{liker?.FullName} đã thích bài viết của bạn",
+                        PostId = postId
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[PostService] Error creating notification: {ex.Message}");
+                    // Don't throw - notification failure shouldn't break like operation
+                }
+            }
+
+            // Update like count in Post table
             if (post != null)
             {
                 post.LikeCount = await _likeRepository.CountAsync(l => l.PostId == postId);
@@ -885,7 +917,8 @@ namespace SocialNetworkMobile.Services.Services
                 response.LikeCount = likeResponses.Count;
                 
                 // Check if current user has liked this post
-                response.IsLiked = await _likeRepository.GetAllAsync(l => l.PostId == post.Id && l.UserId == currentUserId).ContinueWith(t => t.Result.Any());
+                var userLikes = await _likeRepository.GetAllAsync(l => l.PostId == post.Id && l.UserId == currentUserId);
+                response.IsLiked = userLikes.Any();
                 
                 // Get comments with user info
                 var comments = await _commentRepository.GetAllAsync(c => c.PostId == post.Id);
@@ -926,7 +959,8 @@ namespace SocialNetworkMobile.Services.Services
                 }
                 response.Shares = shareResponses;
                 response.ShareCount = shareResponses.Count;
-                response.IsShared = await _shareRepository.GetAllAsync(s => s.PostId == post.Id && s.UserId == currentUserId).ContinueWith(t => t.Result.Any());
+                var userShares = await _shareRepository.GetAllAsync(s => s.PostId == post.Id && s.UserId == currentUserId);
+                response.IsShared = userShares.Any();
 
                 // Get group info if GroupId is present
                 if (post.GroupId.HasValue)
@@ -1001,7 +1035,8 @@ namespace SocialNetworkMobile.Services.Services
                 response.LikeCount = likeResponses.Count;
                 
                 // Check if current user has liked this post
-                response.IsLiked = await _likeRepository.GetAllAsync(l => l.PostId == post.Id && l.UserId == currentUserId).ContinueWith(t => t.Result.Any());
+                var userLikes = await _likeRepository.GetAllAsync(l => l.PostId == post.Id && l.UserId == currentUserId);
+                response.IsLiked = userLikes.Any();
 
                 // Get group info if GroupId is present
                 if (post.GroupId.HasValue)

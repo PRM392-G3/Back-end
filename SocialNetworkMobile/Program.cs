@@ -79,6 +79,9 @@ builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddScoped<IFirebaseAuthService, FirebaseAuthService>();
 builder.Services.AddScoped<IPasswordEncryptionService, PasswordEncryptionService>();
 
+// FCM Notification Service
+builder.Services.AddScoped<IFcmNotificationService, FcmNotificationService>();
+
 // ================= CẤU HÌNH SUPABASE =================
 var supabaseUrl = builder.Configuration["Supabase:Url"];
 var supabaseAnonKey = builder.Configuration["Supabase:AnonKey"];

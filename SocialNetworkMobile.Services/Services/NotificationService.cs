@@ -11,13 +11,16 @@ namespace SocialNetworkMobile.Services.Services
     {
         private readonly GenericRepository<Notification> _notificationRepository;
         private readonly GenericRepository<User> _userRepository;
+        private readonly IFcmNotificationService _fcmNotificationService;
 
         public NotificationService(
             GenericRepository<Notification> notificationRepository,
-            GenericRepository<User> userRepository)
+            GenericRepository<User> userRepository,
+            IFcmNotificationService fcmNotificationService)
         {
             _notificationRepository = notificationRepository;
             _userRepository = userRepository;
+            _fcmNotificationService = fcmNotificationService;
         }
 
         public async Task<NotificationResponse> CreateNotificationAsync(CreateNotificationRequest request)
@@ -44,6 +47,38 @@ namespace SocialNetworkMobile.Services.Services
             };
 
             await _notificationRepository.CreateAsync(notification);
+            
+            // ✅ Send FCM push notification if user has FCM token
+            if (!string.IsNullOrEmpty(user.FcmToken))
+            {
+                try
+                {
+                    Console.WriteLine($"[NotificationService] Sending FCM notification to user {user.Id}");
+                    var data = new Dictionary<string, string>();
+                    if (request.PostId.HasValue)
+                        data["PostId"] = request.PostId.Value.ToString();
+                    if (request.CommentId.HasValue)
+                        data["CommentId"] = request.CommentId.Value.ToString();
+                    data["Type"] = request.Type;
+                    data["FromUserId"] = request.FromUserId.ToString();
+
+                    await _fcmNotificationService.SendNotificationAsync(
+                        user.FcmToken,
+                        request.Title ?? "",
+                        request.Message ?? "",
+                        data
+                    );
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[NotificationService] Error sending FCM notification: {ex.Message}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"[NotificationService] User {user.Id} does not have FCM token");
+            }
+
             return await GetNotificationByIdAsync(notification.Id);
         }
 

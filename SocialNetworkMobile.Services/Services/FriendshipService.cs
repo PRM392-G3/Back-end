@@ -10,10 +10,12 @@ namespace SocialNetworkMobile.Services.Services
     public class FriendshipService : IFriendshipService
     {
         private readonly SocialNetworkDbContext _context;
+        private readonly INotificationService _notificationService;
 
-        public FriendshipService(SocialNetworkDbContext context)
+        public FriendshipService(SocialNetworkDbContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         public async Task<FriendshipResponse> SendFriendRequestAsync(SendFriendRequestRequest request)
@@ -56,6 +58,25 @@ namespace SocialNetworkMobile.Services.Services
 
             _context.Friendships.Add(friendship);
             await _context.SaveChangesAsync();
+
+            // ✅ Create notification for friend request
+            try
+            {
+                Console.WriteLine($"[FriendshipService] Creating notification for friend request from user {request.RequesterId} to user {request.ReceiverId}");
+                await _notificationService.CreateNotificationAsync(new CreateNotificationRequest
+                {
+                    UserId = request.ReceiverId,
+                    FromUserId = request.RequesterId,
+                    Type = "FRIEND_REQUEST",
+                    Title = "Lời mời kết bạn mới",
+                    Message = $"{requester.FullName} đã gửi lời mời kết bạn cho bạn"
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[FriendshipService] Error creating notification: {ex.Message}");
+                // Don't throw - notification failure shouldn't break friend request
+            }
 
             return MapToResponse(friendship);
         }
