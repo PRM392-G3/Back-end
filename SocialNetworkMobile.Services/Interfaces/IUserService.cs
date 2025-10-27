@@ -21,5 +21,12 @@ namespace SocialNetworkMobile.Services.Interfaces
         Task<bool> IsFollowingAsync(int followerId, int followingId);
         Task<List<UserResponse>> GetFollowersWithStatusAsync(int userId, int currentUserId);
         Task<List<UserResponse>> GetFollowingWithStatusAsync(int userId, int currentUserId);
+        Task<bool> UpdateFcmTokenAsync(int userId, string fcmToken);
+        
+        /// <summary>
+        /// ✅ OPTIMIZED: Get lightweight user profile (fast loading)
+        /// Only returns essential info, not full UserResponse
+        /// </summary>
+        Task<UserProfileResponse> GetUserProfileAsync(int userId, int? currentUserId = null);
     }
 }

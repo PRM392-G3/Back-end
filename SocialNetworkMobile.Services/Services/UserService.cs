@@ -13,11 +13,16 @@ namespace SocialNetworkMobile.Services.Services
     {
         private readonly GenericRepository<User> _userRepository;
         private readonly GenericRepository<Follow> _followRepository;
+        private readonly GenericRepository<Post> _postRepository;
 
-        public UserService(GenericRepository<User> userRepository, GenericRepository<Follow> followRepository)
+        public UserService(
+            GenericRepository<User> userRepository, 
+            GenericRepository<Follow> followRepository,
+            GenericRepository<Post> postRepository)
         {
             _userRepository = userRepository;
             _followRepository = followRepository;
+            _postRepository = postRepository;
         }
 
         public async Task<UserResponse> CreateUserAsync(CreateUserRequest request)
@@ -52,12 +57,13 @@ namespace SocialNetworkMobile.Services.Services
 
             var response = user.Adapt<UserResponse>();
             
-            // Get follower and following counts
-            var followers = await _followRepository.GetAllAsync(f => f.FollowingId == id);
-            var following = await _followRepository.GetAllAsync(f => f.FollowerId == id);
+            // ✅ FIX: Use CountAsync instead of GetAllAsync to avoid DbContext concurrent access
+            // Sequential is fine for 2 simple count queries
+            var followersCount = await _followRepository.CountAsync(f => f.FollowingId == id);
+            var followingCount = await _followRepository.CountAsync(f => f.FollowerId == id);
             
-            response.FollowersCount = followers.Count;
-            response.FollowingCount = following.Count;
+            response.FollowersCount = followersCount;
+            response.FollowingCount = followingCount;
             
             return response;
         }
@@ -208,6 +214,10 @@ namespace SocialNetworkMobile.Services.Services
             return responses;
         }
 
+        /// <summary>
+        /// ✅ OPTIMIZED: Search users by name - NO N+1 queries
+        /// Returns lightweight user info without follower/following counts to speed up search
+        /// </summary>
         public async Task<List<UserResponse>> GetUserByNameAsync(string name)
         {
             // Fuzzy search - tìm users có tên chứa từ khóa tìm kiếm
@@ -215,13 +225,30 @@ namespace SocialNetworkMobile.Services.Services
                 u.FullName.ToLower().Contains(name.ToLower()) && u.IsActive);
 
             var responses = new List<UserResponse>();
+            
+            // Get all user IDs for batch query
+            var userIds = users.Select(u => u.Id).ToList();
+            
+            if (!userIds.Any())
+                return responses;
+            
+            // Batch query followers and following counts for all users at once
+            var allFollowers = await _followRepository.GetAllAsync();
+            var followersByUser = allFollowers
+                .Where(f => userIds.Contains(f.FollowingId))
+                .GroupBy(f => f.FollowingId)
+                .ToDictionary(g => g.Key, g => g.Count());
+            
+            var followingByUser = allFollowers
+                .Where(f => userIds.Contains(f.FollowerId))
+                .GroupBy(f => f.FollowerId)
+                .ToDictionary(g => g.Key, g => g.Count());
+
             foreach (var user in users)
             {
                 var response = user.Adapt<UserResponse>();
-                var userFollowers = await _followRepository.GetAllAsync(f => f.FollowingId == user.Id);
-                var userFollowing = await _followRepository.GetAllAsync(f => f.FollowerId == user.Id);
-                response.FollowersCount = userFollowers.Count;
-                response.FollowingCount = userFollowing.Count;
+                response.FollowersCount = followersByUser.GetValueOrDefault(user.Id, 0);
+                response.FollowingCount = followingByUser.GetValueOrDefault(user.Id, 0);
                 response.IsFollowing = false; // Default for search results
                 responses.Add(response);
             }
@@ -286,6 +313,59 @@ namespace SocialNetworkMobile.Services.Services
             }
 
             return responses;
+        }
+
+        public async Task<bool> UpdateFcmTokenAsync(int userId, string fcmToken)
+        {
+            try
+            {
+                var user = await _userRepository.GetByIdAsync(userId);
+                if (user == null)
+                    return false;
+
+                user.FcmToken = fcmToken;
+                await _userRepository.UpdateAsync(user);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// ✅ OPTIMIZED: Get lightweight user profile (fast loading)
+        /// Uses projection to get only essential info - NO N+1 queries
+        /// Returns only essential info for quick preview
+        /// </summary>
+        public async Task<UserProfileResponse> GetUserProfileAsync(int userId, int? currentUserId = null)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+                throw new ArgumentException("User not found");
+
+            var profile = user.Adapt<UserProfileResponse>();
+            
+            // Get counts using parallel queries for better performance
+            var followersCountTask = _followRepository.GetAllAsync(f => f.FollowingId == userId);
+            var followingCountTask = _followRepository.GetAllAsync(f => f.FollowerId == userId);
+            var postsCountTask = _postRepository.GetAllAsync(p => p.UserId == userId && p.IsDeleted == false);
+            
+            // Wait for all tasks to complete
+            await Task.WhenAll(followersCountTask, followingCountTask, postsCountTask);
+            
+            profile.FollowersCount = followersCountTask.Result.Count;
+            profile.FollowingCount = followingCountTask.Result.Count;
+            profile.PostsCount = postsCountTask.Result.Count;
+            
+            // Check follow status if currentUserId provided
+            if (currentUserId.HasValue && currentUserId.Value != userId)
+            {
+                var isFollowing = await _followRepository.GetFirstOrDefaultAsync(f => f.FollowerId == currentUserId.Value && f.FollowingId == userId);
+                profile.IsFollowing = isFollowing != null;
+            }
+            
+            return profile;
         }
     }
 }

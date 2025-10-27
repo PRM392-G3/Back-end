@@ -23,5 +23,11 @@ namespace SocialNetworkMobile.Services.Interfaces
         Task<List<PostResponse>> GetPostsByTagAsync(string tagName);
         Task<List<PostResponse>> GetPostsByGroupIdAsync(int groupId);
         Task<List<PostResponse>> GetPostsByGroupIdWithLikesAsync(int groupId, int currentUserId);
+        
+        /// <summary>
+        /// ✅ TỐI ƯU N+1: Chỉ query METADATA (số like, comment, share)
+        /// Comments được Lazy Load khi user bấm vào
+        /// </summary>
+        Task<List<PostFeedResponse>> GetOptimizedPostsFeedAsync(int currentUserId, int page = 1, int pageSize = 20);
     }
 }
