@@ -5,7 +5,9 @@ using SocialNetworkMobile.Services.Object.Requests;
 using SocialNetworkMobile.Services.Object.Responses;
 using Mapster;
 using BCrypt.Net;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore; 
+using System.Linq; 
+using System.Linq.Expressions; 
 
 namespace SocialNetworkMobile.Services.Services
 {
@@ -14,22 +16,30 @@ namespace SocialNetworkMobile.Services.Services
         private readonly GenericRepository<User> _userRepository;
         private readonly GenericRepository<Follow> _followRepository;
         private readonly GenericRepository<Post> _postRepository;
+        private readonly INotificationService _notificationService;
 
         public UserService(
-            GenericRepository<User> userRepository, 
+           GenericRepository<User> userRepository,
             GenericRepository<Follow> followRepository,
-            GenericRepository<Post> postRepository)
+           GenericRepository<Post> postRepository,
+            INotificationService notificationService)
         {
             _userRepository = userRepository;
             _followRepository = followRepository;
             _postRepository = postRepository;
+            _notificationService = notificationService;
         }
+
+        // --- Basic User Operations (CRUD, Auth) ---
 
         public async Task<UserResponse> CreateUserAsync(CreateUserRequest request)
         {
-            var existingUser = await _userRepository.GetFirstOrDefaultAsync(u => u.Email == request.Email);
-            if (existingUser != null)
+            // Check for existing email
+            bool userExists = await _userRepository.CountAsync(u => u.Email == request.Email) > 0;
+            if (userExists)
+            {
                 throw new ArgumentException("User with this email already exists");
+            }
 
             var user = new User
             {
@@ -40,69 +50,54 @@ namespace SocialNetworkMobile.Services.Services
                 Bio = request.Bio,
                 DateOfBirth = request.DateOfBirth,
                 Location = request.Location,
-                IsActive = true,
+                IsActive = true, // Default to active
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
 
             await _userRepository.CreateAsync(user);
+
+            return user.Adapt<UserResponse>();
+        }
+
+        public async Task<UserResponse> GetUserByEmailAsync(string email)
+        {
+            var user = await _userRepository.GetFirstOrDefaultAsync(u => u.Email == email && u.IsActive);
+            if (user == null)
+            {
+                throw new ArgumentException("User not found or inactive");
+            }
             return user.Adapt<UserResponse>();
         }
 
         public async Task<UserResponse> GetUserByIdAsync(int id)
         {
             var user = await _userRepository.GetByIdAsync(id);
-            if (user == null)
-                throw new ArgumentException("User not found");
-
+            if (user == null || !user.IsActive)
+            {
+                throw new ArgumentException("User not found or inactive");
+            }
             var response = user.Adapt<UserResponse>();
-            
-            // ✅ FIX: Use CountAsync instead of GetAllAsync to avoid DbContext concurrent access
-            // Sequential is fine for 2 simple count queries
-            var followersCount = await _followRepository.CountAsync(f => f.FollowingId == id);
-            var followingCount = await _followRepository.CountAsync(f => f.FollowerId == id);
-            
-            response.FollowersCount = followersCount;
-            response.FollowingCount = followingCount;
-            
             return response;
         }
 
-        public async Task<UserResponse> GetUserByEmailAsync(string email)
-        {
-            var user = await _userRepository.GetFirstOrDefaultAsync(u => u.Email == email);
-            if (user == null)
-                throw new ArgumentException("User not found");
-
-            return user.Adapt<UserResponse>();
-        }
-
-        public async Task<List<UserResponse>> GetAllUsersAsync()
-        {
-            var users = await _userRepository.GetAllAsync();
-            return users.Adapt<List<UserResponse>>();
-        }
 
         public async Task<UserResponse> UpdateUserAsync(int id, UpdateUserRequest request)
         {
             var user = await _userRepository.GetByIdAsync(id);
-            if (user == null)
-                throw new ArgumentException("User not found");
+            if (user == null || !user.IsActive)
+            {
+                throw new ArgumentException("User not found or inactive");
+            }
 
-            if (!string.IsNullOrEmpty(request.FullName))
-                user.FullName = request.FullName;
-            if (!string.IsNullOrEmpty(request.Bio))
-                user.Bio = request.Bio;
-            if (!string.IsNullOrEmpty(request.AvatarUrl))
-                user.AvatarUrl = request.AvatarUrl;
-            if (!string.IsNullOrEmpty(request.CoverImageUrl))
-                user.CoverImageUrl = request.CoverImageUrl;
-            if (!string.IsNullOrEmpty(request.PhoneNumber))
-                user.PhoneNumber = request.PhoneNumber;
-            if (request.DateOfBirth.HasValue)
-                user.DateOfBirth = request.DateOfBirth;
-            if (!string.IsNullOrEmpty(request.Location))
-                user.Location = request.Location;
+            // Update fields only if provided in the request
+            if (!string.IsNullOrEmpty(request.FullName)) user.FullName = request.FullName;
+            if (request.Bio != null) user.Bio = request.Bio; 
+            if (request.AvatarUrl != null) user.AvatarUrl = request.AvatarUrl;
+            if (request.CoverImageUrl != null) user.CoverImageUrl = request.CoverImageUrl;
+            if (!string.IsNullOrEmpty(request.PhoneNumber)) user.PhoneNumber = request.PhoneNumber;
+            if (request.DateOfBirth.HasValue) user.DateOfBirth = request.DateOfBirth.Value.ToUniversalTime(); 
+            if (request.Location != null) user.Location = request.Location;
 
             user.UpdatedAt = DateTime.UtcNow;
 
@@ -114,49 +109,101 @@ namespace SocialNetworkMobile.Services.Services
         {
             var user = await _userRepository.GetByIdAsync(id);
             if (user == null)
-                return false;
+            {
+                return false; 
+            }
+            if (!user.IsActive)
+            {
+                return true;
+            }
 
-            user.IsActive = false;
+            user.IsActive = false; 
+            user.Email = $"deleted_{DateTime.UtcNow.Ticks}_{user.Email}"; 
+            user.PhoneNumber = null; 
             user.UpdatedAt = DateTime.UtcNow;
-            
+
             await _userRepository.UpdateAsync(user);
             return true;
         }
 
         public async Task<UserResponse> LoginAsync(LoginRequest request)
         {
-            var user = await _userRepository.GetFirstOrDefaultAsync(u => u.Email == request.Email);
+            var user = await _userRepository.GetFirstOrDefaultAsync(u => u.Email == request.Email && u.IsActive);
+
             if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            {
                 throw new ArgumentException("Invalid email or password");
+            }
 
             user.LastLoginAt = DateTime.UtcNow;
             await _userRepository.UpdateAsync(user);
 
-            return user.Adapt<UserResponse>();
+            // Return the full profile after successful login
+            var profile = await GetUserProfileAsync(user.Id, user.Id);
+
+            return profile.Adapt<UserResponse>();
         }
 
-        public async Task<UserResponse> GoogleLoginAsync(GoogleLoginRequest request)
+        public async Task<bool> UpdateFcmTokenAsync(int userId, string fcmToken)
         {
-            throw new NotImplementedException("Google login implementation needed");
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null || !user.IsActive)
+            {
+                return false; // User not found or inactive
+            }
+            // Only update if the token is different to avoid unnecessary writes
+            if (user.FcmToken != fcmToken)
+            {
+                user.FcmToken = fcmToken;
+                user.UpdatedAt = DateTime.UtcNow;
+                await _userRepository.UpdateAsync(user);
+            }
+            return true;
         }
+
+        // --- Follow Operations ---
 
         public async Task<bool> FollowUserAsync(int followerId, int followingId)
         {
             if (followerId == followingId)
-                return false;
-
-            var existingFollow = await _followRepository.GetFirstOrDefaultAsync(f => f.FollowerId == followerId && f.FollowingId == followingId);
-            if (existingFollow != null)
-                return false;
-
-            var follow = new Follow
+            {
+                throw new ArgumentException("Cannot follow yourself");
+            }
+            // Check if already following
+            bool alreadyFollowing = await IsFollowingAsync(followerId, followingId);
+            if (alreadyFollowing)
+            {
+                return true; 
+            }
+            // Check if target user exists and is active
+            bool targetUserExists = await _userRepository.CountAsync(u => u.Id == followingId && u.IsActive) > 0;
+            if (!targetUserExists)
+            {
+                throw new ArgumentException("User to follow not found or inactive");
+            }
+            var followerUser = await _userRepository.GetByIdAsync(followerId);
+            var followingUser = await _userRepository.GetByIdAsync(followingId);
+            await _followRepository.CreateAsync(new Follow
             {
                 FollowerId = followerId,
                 FollowingId = followingId,
                 CreatedAt = DateTime.UtcNow
-            };
-
-            await _followRepository.CreateAsync(follow);
+            });
+            try
+            {
+                await _notificationService.CreateNotificationAsync(new CreateNotificationRequest
+                {
+                    UserId = followingId,         
+                    FromUserId = followerId,     
+                    Type = "FOLLOW",
+                    Title = "Bạn có người theo dõi mới",
+                    Message = $"{followerUser.FullName} đã bắt đầu theo dõi bạn."
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[UserService] Error creating FOLLOW notification: {ex.Message}");
+            }
             return true;
         }
 
@@ -164,208 +211,209 @@ namespace SocialNetworkMobile.Services.Services
         {
             var follow = await _followRepository.GetFirstOrDefaultAsync(f => f.FollowerId == followerId && f.FollowingId == followingId);
             if (follow == null)
-                return false;
-
+            {
+                return false; // Not following, nothing to unfollow
+            }
             await _followRepository.DeleteAsync(follow);
             return true;
         }
 
-        public async Task<List<UserResponse>> GetFollowersAsync(int userId)
-        {
-            var followers = await _followRepository.GetAllAsync(f => f.FollowingId == userId);
-            var followerIds = followers.Select(f => f.FollowerId).ToList();
-            
-            var users = await _userRepository.GetAllAsync(u => followerIds.Contains(u.Id));
-            var responses = new List<UserResponse>();
-
-            foreach (var user in users)
-            {
-                var response = user.Adapt<UserResponse>();
-                var userFollowers = await _followRepository.GetAllAsync(f => f.FollowingId == user.Id);
-                var userFollowing = await _followRepository.GetAllAsync(f => f.FollowerId == user.Id);
-                response.FollowersCount = userFollowers.Count;
-                response.FollowingCount = userFollowing.Count;
-                response.IsFollowing = false; // Followers are not following the current user
-                responses.Add(response);
-            }
-
-            return responses;
-        }
-
-        public async Task<List<UserResponse>> GetFollowingAsync(int userId)
-        {
-            var following = await _followRepository.GetAllAsync(f => f.FollowerId == userId);
-            var followingIds = following.Select(f => f.FollowingId).ToList();
-            
-            var users = await _userRepository.GetAllAsync(u => followingIds.Contains(u.Id));
-            var responses = new List<UserResponse>();
-
-            foreach (var user in users)
-            {
-                var response = user.Adapt<UserResponse>();
-                var userFollowers = await _followRepository.GetAllAsync(f => f.FollowingId == user.Id);
-                var userFollowing = await _followRepository.GetAllAsync(f => f.FollowerId == user.Id);
-                response.FollowersCount = userFollowers.Count;
-                response.FollowingCount = userFollowing.Count;
-                response.IsFollowing = true; // These are people the current user is following
-                responses.Add(response);
-            }
-
-            return responses;
-        }
-
-        /// <summary>
-        /// ✅ OPTIMIZED: Search users by name - NO N+1 queries
-        /// Returns lightweight user info without follower/following counts to speed up search
-        /// </summary>
-        public async Task<List<UserResponse>> GetUserByNameAsync(string name)
-        {
-            // Fuzzy search - tìm users có tên chứa từ khóa tìm kiếm
-            var users = await _userRepository.GetAllAsync(u => 
-                u.FullName.ToLower().Contains(name.ToLower()) && u.IsActive);
-
-            var responses = new List<UserResponse>();
-            
-            // Get all user IDs for batch query
-            var userIds = users.Select(u => u.Id).ToList();
-            
-            if (!userIds.Any())
-                return responses;
-            
-            // Batch query followers and following counts for all users at once
-            var allFollowers = await _followRepository.GetAllAsync();
-            var followersByUser = allFollowers
-                .Where(f => userIds.Contains(f.FollowingId))
-                .GroupBy(f => f.FollowingId)
-                .ToDictionary(g => g.Key, g => g.Count());
-            
-            var followingByUser = allFollowers
-                .Where(f => userIds.Contains(f.FollowerId))
-                .GroupBy(f => f.FollowerId)
-                .ToDictionary(g => g.Key, g => g.Count());
-
-            foreach (var user in users)
-            {
-                var response = user.Adapt<UserResponse>();
-                response.FollowersCount = followersByUser.GetValueOrDefault(user.Id, 0);
-                response.FollowingCount = followingByUser.GetValueOrDefault(user.Id, 0);
-                response.IsFollowing = false; // Default for search results
-                responses.Add(response);
-            }
-
-            return responses;
-        }
-
-
         public async Task<bool> IsFollowingAsync(int followerId, int followingId)
         {
-            var follow = await _followRepository.GetFirstOrDefaultAsync(f => f.FollowerId == followerId && f.FollowingId == followingId);
-            return follow != null;
+            return await _followRepository.CountAsync(f => f.FollowerId == followerId && f.FollowingId == followingId) > 0;
         }
 
-        public async Task<List<UserResponse>> GetFollowersWithStatusAsync(int userId, int currentUserId)
+        // --- Optimized List Operations (Using IQueryable & Projection) ---
+
+        /// <summary>
+        /// Gets a paginated list of active users with basic info.
+        /// </summary>
+        public async Task<List<UserResponse>> GetAllUsersAsync(int page = 1, int limit = 20)
         {
-            var followers = await _followRepository.GetAllAsync(f => f.FollowingId == userId);
-            var followerIds = followers.Select(f => f.FollowerId).ToList();
-            
-            var users = await _userRepository.GetAllAsync(u => followerIds.Contains(u.Id));
-            var responses = new List<UserResponse>();
-
-            foreach (var user in users)
-            {
-                var response = user.Adapt<UserResponse>();
-                var userFollowers = await _followRepository.GetAllAsync(f => f.FollowingId == user.Id);
-                var userFollowing = await _followRepository.GetAllAsync(f => f.FollowerId == user.Id);
-                response.FollowersCount = userFollowers.Count;
-                response.FollowingCount = userFollowing.Count;
-                
-                // Check if current user is following this user
-                var isFollowing = await _followRepository.GetFirstOrDefaultAsync(f => f.FollowerId == currentUserId && f.FollowingId == user.Id);
-                response.IsFollowing = isFollowing != null;
-                
-                responses.Add(response);
-            }
-
-            return responses;
-        }
-
-        public async Task<List<UserResponse>> GetFollowingWithStatusAsync(int userId, int currentUserId)
-        {
-            var following = await _followRepository.GetAllAsync(f => f.FollowerId == userId);
-            var followingIds = following.Select(f => f.FollowingId).ToList();
-            
-            var users = await _userRepository.GetAllAsync(u => followingIds.Contains(u.Id));
-            var responses = new List<UserResponse>();
-
-            foreach (var user in users)
-            {
-                var response = user.Adapt<UserResponse>();
-                var userFollowers = await _followRepository.GetAllAsync(f => f.FollowingId == user.Id);
-                var userFollowing = await _followRepository.GetAllAsync(f => f.FollowerId == user.Id);
-                response.FollowersCount = userFollowers.Count;
-                response.FollowingCount = userFollowing.Count;
-                
-                // Check if current user is following this user
-                var isFollowing = await _followRepository.GetFirstOrDefaultAsync(f => f.FollowerId == currentUserId && f.FollowingId == user.Id);
-                response.IsFollowing = isFollowing != null;
-                
-                responses.Add(response);
-            }
-
-            return responses;
-        }
-
-        public async Task<bool> UpdateFcmTokenAsync(int userId, string fcmToken)
-        {
-            try
-            {
-                var user = await _userRepository.GetByIdAsync(userId);
-                if (user == null)
-                    return false;
-
-                user.FcmToken = fcmToken;
-                await _userRepository.UpdateAsync(user);
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+            var users = await _userRepository.GetQueryable()
+                .Where(u => u.IsActive)
+                .OrderBy(u => u.FullName) 
+                .Skip((page - 1) * limit)
+                .Take(limit)
+                .Select(u => new UserResponse
+                {
+                    Id = u.Id,
+                    FullName = u.FullName,
+                    AvatarUrl = u.AvatarUrl,
+                    Bio = u.Bio
+                })
+                .ToListAsync();
+            return users;
         }
 
         /// <summary>
-        /// ✅ OPTIMIZED: Get lightweight user profile (fast loading)
-        /// Uses projection to get only essential info - NO N+1 queries
-        /// Returns only essential info for quick preview
+        /// Searches active users by name (paginated) and includes follow counts.
+        /// </summary>
+        public async Task<List<UserResponse>> GetUserByNameAsync(string name, int page = 1, int limit = 20)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return new List<UserResponse>(); 
+            }
+            var query = name.Trim().ToLower(); 
+
+
+            var users = await _userRepository.GetQueryable()
+                .Where(u => u.FullName.ToLower().Contains(query) && u.IsActive)
+                .OrderBy(u => u.FullName)
+                .Skip((page - 1) * limit)
+                .Take(limit)
+                .Select(u => new UserResponse
+                {
+                    Id = u.Id,
+                    FullName = u.FullName,
+                    AvatarUrl = u.AvatarUrl,
+                    Bio = u.Bio,
+                    FollowersCount = _followRepository.GetQueryable().Count(f => f.FollowingId == u.Id),
+                    FollowingCount = _followRepository.GetQueryable().Count(f => f.FollowerId == u.Id),
+                    IsFollowing = false
+                })
+                .ToListAsync();
+            return users;
+        }
+
+        /// <summary>
+        /// Gets user profile including follow/post counts and follow status relative to current user.
+        /// Optimized using CountAsync.
         /// </summary>
         public async Task<UserProfileResponse> GetUserProfileAsync(int userId, int? currentUserId = null)
         {
+            // Use GetByIdAsync which should handle the existence check
             var user = await _userRepository.GetByIdAsync(userId);
-            if (user == null)
-                throw new ArgumentException("User not found");
+            if (user == null || !user.IsActive)
+            {
+                throw new ArgumentException("User not found or inactive");
+            }
 
             var profile = user.Adapt<UserProfileResponse>();
-            
-            // Get counts using parallel queries for better performance
-            var followersCountTask = _followRepository.GetAllAsync(f => f.FollowingId == userId);
-            var followingCountTask = _followRepository.GetAllAsync(f => f.FollowerId == userId);
-            var postsCountTask = _postRepository.GetAllAsync(p => p.UserId == userId && p.IsDeleted == false);
-            
-            // Wait for all tasks to complete
+
+            var followersCountTask = _followRepository.CountAsync(f => f.FollowingId == userId);
+            var followingCountTask = _followRepository.CountAsync(f => f.FollowerId == userId);
+            var postsCountTask = _postRepository.CountAsync(p => p.UserId == userId && !p.IsDeleted); 
             await Task.WhenAll(followersCountTask, followingCountTask, postsCountTask);
-            
-            profile.FollowersCount = followersCountTask.Result.Count;
-            profile.FollowingCount = followingCountTask.Result.Count;
-            profile.PostsCount = postsCountTask.Result.Count;
-            
-            // Check follow status if currentUserId provided
+
+            profile.FollowersCount = followersCountTask.Result;
+            profile.FollowingCount = followingCountTask.Result;
+            profile.PostsCount = postsCountTask.Result;
+
             if (currentUserId.HasValue && currentUserId.Value != userId)
             {
-                var isFollowing = await _followRepository.GetFirstOrDefaultAsync(f => f.FollowerId == currentUserId.Value && f.FollowingId == userId);
-                profile.IsFollowing = isFollowing != null;
+                profile.IsFollowing = await IsFollowingAsync(currentUserId.Value, userId);
             }
-            
+            else
+            {
+                profile.IsFollowing = false;
+            }
+
             return profile;
         }
+
+        // --- Optimized Follower/Following Lists ---
+
+        /// <summary>
+        /// Gets paginated list of followers with counts.
+        /// </summary>
+        public async Task<List<UserResponse>> GetFollowersAsync(int userId, int page = 1, int limit = 20)
+        {
+            var followers = await _followRepository.GetQueryable()
+                .Where(f => f.FollowingId == userId && f.Follower.IsActive) 
+                .Select(f => f.Follower)
+                .OrderBy(u => u.FullName)
+                .Skip((page - 1) * limit)
+                .Take(limit)
+                .Select(u => new UserResponse // Project to DTO
+                {
+                    Id = u.Id,
+                    FullName = u.FullName,
+                    AvatarUrl = u.AvatarUrl,
+                    Bio = u.Bio,
+                    FollowersCount = _followRepository.GetQueryable().Count(flw => flw.FollowingId == u.Id),
+                    FollowingCount = _followRepository.GetQueryable().Count(flw => flw.FollowerId == u.Id),
+                    IsFollowing = false
+                })
+                .ToListAsync();
+            return followers;
+        }
+
+        /// <summary>
+        /// Gets paginated list of users being followed (following) with counts.
+        /// </summary>
+        public async Task<List<UserResponse>> GetFollowingAsync(int userId, int page = 1, int limit = 20)
+        {
+            var following = await _followRepository.GetQueryable()
+                .Select(f => f.Following) 
+                .OrderBy(u => u.FullName)
+                .Skip((page - 1) * limit)
+                .Take(limit)
+                .Select(u => new UserResponse // Project to DTO
+                {
+                    Id = u.Id,
+                    FullName = u.FullName,
+                    AvatarUrl = u.AvatarUrl,
+                    Bio = u.Bio,
+                    FollowersCount = _followRepository.GetQueryable().Count(flw => flw.FollowingId == u.Id),
+                    FollowingCount = _followRepository.GetQueryable().Count(flw => flw.FollowerId == u.Id),
+                    IsFollowing = true 
+                })
+                .ToListAsync();
+            return following;
+        }
+
+        /// <summary>
+        /// Gets paginated followers list with counts and accurate IsFollowing status relative to current user.
+        /// </summary>
+        public async Task<List<UserResponse>> GetFollowersWithStatusAsync(int userId, int currentUserId, int page = 1, int limit = 20)
+        {
+            var followers = await _followRepository.GetQueryable()
+                .Where(f => f.FollowingId == userId && f.Follower.IsActive)
+                .Select(f => f.Follower)
+                .OrderBy(u => u.FullName)
+                .Skip((page - 1) * limit)
+                .Take(limit)
+                .Select(u => new UserResponse
+                {
+                    Id = u.Id,
+                    FullName = u.FullName,
+                    AvatarUrl = u.AvatarUrl,
+                    Bio = u.Bio,
+                    FollowersCount = _followRepository.GetQueryable().Count(flw => flw.FollowingId == u.Id),
+                    FollowingCount = _followRepository.GetQueryable().Count(flw => flw.FollowerId == u.Id),
+                    IsFollowing = _followRepository.GetQueryable().Any(flw => flw.FollowerId == currentUserId && flw.FollowingId == u.Id)
+                })
+                .ToListAsync();
+            return followers;
+        }
+
+        /// <summary>
+        /// Gets paginated following list with counts and accurate IsFollowing status relative to current user.
+        /// </summary>
+        public async Task<List<UserResponse>> GetFollowingWithStatusAsync(int userId, int currentUserId, int page = 1, int limit = 20)
+        {
+     
+            var following = await _followRepository.GetQueryable()
+                .Where(f => f.FollowerId == userId && f.Following.IsActive)
+                .Select(f => f.Following)
+                .OrderBy(u => u.FullName)
+                .Skip((page - 1) * limit)
+                .Take(limit)
+                .Select(u => new UserResponse
+                {
+                    Id = u.Id,
+                    FullName = u.FullName,
+                    AvatarUrl = u.AvatarUrl,
+                    Bio = u.Bio,
+                    FollowersCount = _followRepository.GetQueryable().Count(flw => flw.FollowingId == u.Id),
+                    FollowingCount = _followRepository.GetQueryable().Count(flw => flw.FollowerId == u.Id),
+                    IsFollowing = _followRepository.GetQueryable().Any(flw => flw.FollowerId == currentUserId && flw.FollowingId == u.Id)
+                })
+                .ToListAsync();
+            return following;
+        }
+
     }
 }

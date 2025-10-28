@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using SocialNetworkMobile.Repository;
@@ -11,7 +11,7 @@ using SocialNetworkMobile.Repository.Context;
 
 namespace SocialNetworkMobile.Repository.Basic
 {
-    public class GenericRepository<T> : IGenericRepository<T> where T : class
+    public class GenericRepository<T>  where T : class
     {
         protected SocialNetworkDbContext _context;
 
@@ -84,7 +84,30 @@ namespace SocialNetworkMobile.Repository.Basic
                 throw new Exception($"Error creating {typeof(T).Name}: {ex.Message}", ex);
             }
         }
+        /// <summary>
+        /// Lấy IQueryable để xây dựng truy vấn phức tạp (VỚI tracking)
+        /// </summary>
+        public IQueryable<T> GetQueryableWithTracking()
+        {
+            return _context.Set<T>();
+        }
 
+        /// <summary>
+        /// Lấy IQueryable để xây dựng truy vấn phức tạp (KHÔNG tracking)
+        /// Tối ưu cho các truy vấn CHỈ ĐỌC (READ-ONLY)
+        /// </summary>
+        public IQueryable<T> GetQueryable()
+        {
+            return _context.Set<T>().AsNoTracking();
+        }
+
+        /// <summary>
+        /// Lấy IQueryable (KHÔNG tracking) VỚI điều kiện
+        /// </summary>
+        public IQueryable<T> GetQueryable(Expression<Func<T, bool>> predicate)
+        {
+            return _context.Set<T>().Where(predicate).AsNoTracking();
+        }
 
         public async Task<int> CreateAsyncWithCheckExist(T entity)
         {

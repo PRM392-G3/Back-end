@@ -83,7 +83,7 @@ namespace SocialNetworkMobile.Controllers
                     return BadRequest(new { error = "Search query is required" });
                 }
 
-                var users = await _userService.GetUserByNameAsync(name);
+                var users = await _userService.GetUserByNameAsync(name, page, limit);
 
                 if (users == null || !users.Any())
                     return Ok(new List<UserResponse>()); // Return empty list instead of NotFound
@@ -102,9 +102,9 @@ namespace SocialNetworkMobile.Controllers
 
 
         [HttpGet]
-        public async Task<ActionResult<List<UserResponse>>> GetAllUsers()
+        public async Task<ActionResult<List<UserResponse>>> GetAllUsers([FromQuery] int page = 1, [FromQuery] int limit = 20)
         {
-            var users = await _userService.GetAllUsersAsync();
+            var users = await _userService.GetAllUsersAsync(page, limit);
             return Ok(users);
         }
 
@@ -175,11 +175,11 @@ namespace SocialNetworkMobile.Controllers
         }
 
         [HttpGet("{userId}/followers")]
-        public async Task<ActionResult<List<UserResponse>>> GetFollowers(int userId)
+        public async Task<ActionResult<List<UserResponse>>> GetFollowers(int userId, [FromQuery] int page = 1, [FromQuery] int limit = 20)
         {
             try
             {
-                var followers = await _userService.GetFollowersAsync(userId);
+                var followers = await _userService.GetFollowersAsync(userId, page, limit);
                 return Ok(followers);
             }
             catch (ArgumentException ex)
@@ -190,7 +190,7 @@ namespace SocialNetworkMobile.Controllers
 
         [HttpGet("{userId}/followers/with-status")]
         [Authorize]
-        public async Task<ActionResult<List<UserResponse>>> GetFollowersWithStatus(int userId)
+        public async Task<ActionResult<List<UserResponse>>> GetFollowersWithStatus(int userId, [FromQuery] int page = 1, [FromQuery] int limit = 20)
         {
             try
             {
@@ -198,7 +198,7 @@ namespace SocialNetworkMobile.Controllers
                 if (currentUserId == 0)
                     return Unauthorized(new { error = "Invalid user token" });
 
-                var followers = await _userService.GetFollowersWithStatusAsync(userId, currentUserId);
+                var followers = await _userService.GetFollowersWithStatusAsync(userId, currentUserId, page, limit);
                 return Ok(followers);
             }
             catch (ArgumentException ex)
@@ -208,11 +208,11 @@ namespace SocialNetworkMobile.Controllers
         }
 
         [HttpGet("{userId}/following")]
-        public async Task<ActionResult<List<UserResponse>>> GetFollowing(int userId)
+        public async Task<ActionResult<List<UserResponse>>> GetFollowing(int userId, [FromQuery] int page = 1, [FromQuery] int limit = 20)
         {
             try
             {
-                var following = await _userService.GetFollowingAsync(userId);
+                var following = await _userService.GetFollowingAsync(userId, page, limit);
                 return Ok(following);
             }
             catch (ArgumentException ex)
@@ -223,7 +223,7 @@ namespace SocialNetworkMobile.Controllers
 
         [HttpGet("{userId}/following/with-status")]
         [Authorize]
-        public async Task<ActionResult<List<UserResponse>>> GetFollowingWithStatus(int userId)
+        public async Task<ActionResult<List<UserResponse>>> GetFollowingWithStatus(int userId, [FromQuery] int page = 1, [FromQuery] int limit = 20)
         {
             try
             {
@@ -231,7 +231,7 @@ namespace SocialNetworkMobile.Controllers
                 if (currentUserId == 0)
                     return Unauthorized(new { error = "Invalid user token" });
 
-                var following = await _userService.GetFollowingWithStatusAsync(userId, currentUserId);
+                var following = await _userService.GetFollowingWithStatusAsync(userId, currentUserId, page, limit);
                 return Ok(following);
             }
             catch (ArgumentException ex)
