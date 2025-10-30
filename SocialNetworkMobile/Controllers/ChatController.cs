@@ -58,6 +58,26 @@ namespace SocialNetworkMobile.Controllers
         }
 
         /// <summary>
+        /// Get conversation by ID
+        /// </summary>
+        [HttpGet("conversations/{conversationId}")]
+        public async Task<ActionResult<ConversationResponse>> GetConversationById(int conversationId)
+        {
+            try
+            {
+                var conversation = await _chatService.GetConversationByIdAsync(conversationId);
+                if (conversation == null)
+                    return NotFound("Conversation not found");
+                
+                return Ok(conversation);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Get all conversations for a user
         /// </summary>
         [HttpGet("conversations/user/{userId}")]

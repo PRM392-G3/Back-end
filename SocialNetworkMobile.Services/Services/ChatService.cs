@@ -62,6 +62,20 @@ namespace SocialNetworkMobile.Services.Services
             return await GetConversationResponseAsync(conversation);
         }
 
+        public async Task<ConversationResponse?> GetConversationByIdAsync(int conversationId)
+        {
+            var conversation = await _context.Conversations
+                .Include(c => c.User1)
+                .Include(c => c.User2)
+                .Include(c => c.Messages.OrderByDescending(m => m.CreatedAt).Take(1))
+                .FirstOrDefaultAsync(c => c.Id == conversationId);
+
+            if (conversation == null)
+                return null;
+
+            return await GetConversationResponseAsync(conversation);
+        }
+
         public async Task<List<ConversationResponse>> GetUserConversationsAsync(int userId)
         {
             var conversations = await _context.Conversations

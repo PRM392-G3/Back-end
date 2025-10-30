@@ -8,6 +8,7 @@ namespace SocialNetworkMobile.Services.Interfaces
         // Conversation methods
         Task<ConversationResponse> CreateConversationAsync(CreateConversationRequest request);
         Task<ConversationResponse?> GetConversationAsync(int user1Id, int user2Id);
+        Task<ConversationResponse?> GetConversationByIdAsync(int conversationId);
         Task<List<ConversationResponse>> GetUserConversationsAsync(int userId);
         
         // Message methods
