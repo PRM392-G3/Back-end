@@ -1,0 +1,89 @@
+# .dockerignore for teamseven.EzExam.API (.NET/C#)
+
+# 1. Version control
+.git/
+.gitignore
+.gitattributes
+.github/
+.svn/
+.hg/
+
+# 2. IDE and editor files
+.vs/
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.swp
+*.swo
+
+# 3. Build outputs and intermediate files
+bin/
+obj/
+
+# 4. Test and debug artifacts
+dist/
+build/
+out/
+debug/
+*.log
+*.tmp
+tmp/
+temp/
+
+# 5. Environment and secrets
+.env*
+*.env
+*.pem
+*.key
+*.crt
+config.local.*
+*.local.yml
+appsettings.json
+appsettings.Development.json
+ezexam-80d4b-firebase-adminsdk-fbsvc-40c0038443.json
+
+# 6. Project-specific and documentation
+docs/
+*.md
+README*
+Dockerfile*
+docker-compose*
+
+# 7. Language-specific (for completeness, even if not present)
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+node_modules/
+npm-debug.log
+yarn-debug.log
+/vendor/
+*.test
+.go-cache/
+target/
+*.class
+.gradle/
+
+# 8. Miscellaneous and temporary
+.local/
+local/
+*.vsidx
+*.db
+*.db-shm
+*.db-wal
+*.v2
+*.bin
+
+# 9. HTTP test files
+*.http
+
+
+#10. WIndows build temp files
+**/bin/
+**/obj/
+
+# End of .dockerignore

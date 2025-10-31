@@ -1,0 +1,28 @@
+
+version: '3.8'
+
+services:
+  nexora-backend-api:
+    image: minhtri10504/nexora-backend:latest  
+    container_name: nexora-backend-api
+    restart: unless-stopped
+    init: true
+    ports:
+      - "5078:5078"
+    networks:
+      # Tạo network MỚI
+      - nexora-net
+    
+    volumes:
+      - ~/nexora_secret/appsettings.json:/app/appsettings.json:ro
+      # Cập nhật file firebase mới
+      - ~/nexora_secret/tringuyxn-nexora-firebase-firebase-adminsdk-fbsvc-5ded412996.json:/app/tringuyxn-nexora-firebase-firebase-adminsdk-fbsvc-5ded412996.json:ro
+
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+
+networks:
+  nexora-net:
+    driver: bridge
+
+
